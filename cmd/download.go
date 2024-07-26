@@ -1,27 +1,51 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
+	"log/slog"
+	"os"
 
 	"github.com/spf13/cobra"
 )
 
+type DownloadArgsOption struct {
+	SiteName string
+}
+
+var downloadArgsOption DownloadArgsOption
+
 // downloadCmd represents the download command
 var downloadCmd = &cobra.Command{
 	Use:   "download",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("download called")
+	Short: "Download from website",
+	Long:  `Download from website`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		slog.Info("download called")
+		if len(args) == 0 {
+			return fmt.Errorf("required website args")
+		}
+		downloadArgsOption.SiteName = args[0]
+		return startDownload(downloadArgsOption.SiteName)
 	},
 }
 
+func startDownload(siteName string) (err error) {
+	_ = context.Background()
+
+	switch siteName {
+	case "sbi":
+
+	default:
+		return fmt.Errorf("unknown website")
+	}
+
+	return nil
+}
+
 func init() {
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	slog.SetDefault(logger)
 	rootCmd.AddCommand(downloadCmd)
 
 	// Here you will define your flags and configuration settings.
