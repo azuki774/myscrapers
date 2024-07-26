@@ -5,16 +5,17 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"scraper-go/internal/scenario"
 
 	"github.com/spf13/cobra"
 )
 
-type DownloadArgsOption struct {
+var downloadArgsOption downloadArgsOpt
+
+type downloadArgsOpt struct {
 	SiteName  string
 	OutputDir string
 }
-
-var downloadArgsOption DownloadArgsOption
 
 // downloadCmd represents the download command
 var downloadCmd = &cobra.Command{
@@ -32,21 +33,28 @@ var downloadCmd = &cobra.Command{
 	},
 }
 
-func startDownload(opts DownloadArgsOption) (err error) {
-	_ = context.Background()
+func startDownload(opts downloadArgsOpt) (err error) {
+	ctx := context.Background()
 	slog.Info("show config", "sitename", opts.SiteName, "outputDir", opts.OutputDir)
 	switch opts.SiteName {
 	case "sbi":
-
+		user := os.Getenv("user")
+		pass := os.Getenv("pass")
+		sc, err := scenario.NewScenarioSBI(downloadArgsOption.OutputDir, user, pass)
+		if err != nil {
+			slog.Error("failed to create scenario sbi", slog.String("error", err.Error()))
+			return err
+		}
+		slog.Info("success scenario sbi")
+		return sc.Start(ctx)
 	default:
 		return fmt.Errorf("unknown website")
 	}
 
-	return nil
 }
 
 func init() {
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{AddSource: true}))
 	slog.SetDefault(logger)
 	rootCmd.AddCommand(downloadCmd)
 
