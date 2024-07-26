@@ -10,7 +10,8 @@ import (
 )
 
 type DownloadArgsOption struct {
-	SiteName string
+	SiteName  string
+	OutputDir string
 }
 
 var downloadArgsOption DownloadArgsOption
@@ -26,14 +27,15 @@ var downloadCmd = &cobra.Command{
 			return fmt.Errorf("required website args")
 		}
 		downloadArgsOption.SiteName = args[0]
-		return startDownload(downloadArgsOption.SiteName)
+
+		return startDownload(downloadArgsOption)
 	},
 }
 
-func startDownload(siteName string) (err error) {
+func startDownload(opts DownloadArgsOption) (err error) {
 	_ = context.Background()
-
-	switch siteName {
+	slog.Info("show config", "sitename", opts.SiteName, "outputDir", opts.OutputDir)
+	switch opts.SiteName {
 	case "sbi":
 
 	default:
@@ -48,13 +50,11 @@ func init() {
 	slog.SetDefault(logger)
 	rootCmd.AddCommand(downloadCmd)
 
-	// Here you will define your flags and configuration settings.
+	// Get current path
+	currPath, err := os.Getwd()
+	if err != nil {
+		panic(err)
+	}
 
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// downloadCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// downloadCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	downloadCmd.Flags().StringVarP(&downloadArgsOption.OutputDir, "output", "o", currPath, "output directory")
 }
