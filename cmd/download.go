@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"scraper-go/internal/scenario"
+	"myscrapers/internal/scenario"
 
 	"github.com/spf13/cobra"
 )

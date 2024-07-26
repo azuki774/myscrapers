@@ -4,7 +4,7 @@ Copyright © 2024 NAME HERE <EMAIL ADDRESS>
 */
 package main
 
-import "scraper-go/cmd"
+import "myscrapers/cmd"
 
 func main() {
 	cmd.Execute()

@@ -1,6 +1,6 @@
 SHELL=/bin/bash
 VERSION=latest
-container_name=scraper-go
+container_name=myscrapers
 
 .PHONY: bin-linux-amd64
 

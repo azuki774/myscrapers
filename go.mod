@@ -1,4 +1,4 @@
-module scraper-go
+module myscrapers
 
 go 1.21.0
 

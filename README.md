@@ -1,1 +1,1 @@
-# scraper-go
+# myscrapers
