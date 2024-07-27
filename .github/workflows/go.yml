@@ -22,7 +22,7 @@ jobs:
     - name: set up module
       run: make setup
 
-    - name: set up module
+    - name: go lint
       run: make lint
 
     - name: go test
