@@ -14,8 +14,8 @@ import (
 const defaultOutputDir = "/data"
 
 type testGitHub struct { // for test
-	common    ScenarioCommon
-	browser   *rod.Browser
+	common  ScenarioCommon
+	browser *rod.Browser
 }
 
 func NewTestGitHub() *testGitHub {
