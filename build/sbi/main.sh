@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 set -e
 YYYYMM=`date '+%Y%m'`
 YYYYMMDD=`date '+%Y%m%d'`
@@ -22,7 +22,7 @@ function fetch () {
     echo "fetcher complete"
 }
 
-function create_s3_credentials {
+function create_s3_credentials () {
     echo "s3 credentials create start"
     mkdir -p ~/.aws/
 
