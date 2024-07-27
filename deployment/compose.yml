@@ -1,8 +1,0 @@
-services:
-  myscrapers-test-github:
-    image: myscrapers
-    container_name: myscrapers-test-github
-    environment:
-      - wsAddr=katarina.int.azuki.blue:7317
-    volumes:
-      - ./browser/:/data/
