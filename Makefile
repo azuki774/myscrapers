@@ -12,7 +12,7 @@ bin-linux-amd64:
 	-o build/bin/ ./...
 
 build:
-	docker build -t $(container_name):$(VERSION) -f build/Dockerfile .
+	docker build -t $(container_name):$(VERSION) -f build/sbi/Dockerfile .
 
 start:
 	docker compose -f deployment/compose.yml up -d

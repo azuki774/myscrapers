@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 set -e
 YYYYMM=`date '+%Y%m'`
 YYYYMMDD=`date '+%Y%m%d'`
@@ -42,7 +42,8 @@ function create_s3_credentials {
 function s3_upload () {
     echo "s3 upload start"
     mkdir -p ${DATA_DIR}/${YYYYMM}
-    mv ${DATA_DIR}/* ${DATA_DIR}/${YYYYMM}/ # $DATA_DIR -> $DATA_DIR/$YYYYMM/
+    cp -f ${DATA_DIR}/*.csv ${DATA_DIR}/${YYYYMM}/ # ex. $DATA_DIR/YYYYMMDD_1.csv -> $DATA_DIR/$YYYYMM/YYYYMMDD_1.csv
+    rm ${DATA_DIR}/*.csv
     ${AWS_BIN} s3 cp ${DATA_DIR}/${YYYYMM}/ "s3://${BUCKET_NAME}/${REMOTE_DIR}" --recursive --endpoint-url="${BUCKET_URL}"
     echo "s3 upload complete"
 }
