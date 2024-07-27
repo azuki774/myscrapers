@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"myscrapers/internal/csv"
 	"os"
 	"strings"
 	"time"
@@ -127,5 +128,7 @@ func (s *ScenarioSBI) Start(ctx context.Context) error {
 	fmt.Println(s.Headers)
 	fmt.Println("-----------------------------")
 	fmt.Println(s.Bodies)
+
+	csv.WriteFile("./output.csv", s.Headers, s.Bodies)
 	return nil
 }
