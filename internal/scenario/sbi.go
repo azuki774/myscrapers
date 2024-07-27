@@ -100,7 +100,7 @@ func (s *ScenarioSBI) login(ctx context.Context) error {
 func (s *ScenarioSBI) getPortfolio(ctx context.Context) error {
 	// ポートフォリオページに移動
 	slog.Info("move Portfolio page")
-	page := s.browser.Timeout(30 * time.Second).MustPage(portfolioURL).MustWaitStable()
+	page := s.browser.MustPage(portfolioURL).MustWaitStable()
 	_, err := page.Screenshot(true, &proto.PageCaptureScreenshot{
 		Format: proto.PageCaptureScreenshotFormatPng,
 		Clip: &proto.PageViewport{
@@ -137,6 +137,12 @@ func (s *ScenarioSBI) getPortfolio(ctx context.Context) error {
 		}
 		slog.Info("datected Portfolio table")
 		tables2 = append(tables2, val)
+	}
+
+	if len(tables2) == 0 {
+		// 1つもテーブルが見つからなかった場合、ログインに失敗していそう
+		slog.Warn("portfolio table not found. perhaps login not sucessfully")
+		return fmt.Errorf("portfolio table not found")
 	}
 
 	// 1テーブルごとに処理
@@ -186,7 +192,7 @@ func (s *ScenarioSBI) getPortfolio(ctx context.Context) error {
 
 		// filename: 0-indexed -> 1-indexed
 		// ex. 20240501_1.csv
-		fileDir := filepath.Join(s.common.outputDir, fmt.Sprintf("%s_%d.jpg", s.yyyymmdd, i+1))
+		fileDir := filepath.Join(s.common.outputDir, fmt.Sprintf("%s_%d.csv", s.yyyymmdd, i+1))
 		if err := csv.WriteFile(fileDir, headers, bodies); err != nil {
 			return err
 		}
