@@ -2,7 +2,7 @@ SHELL=/bin/bash
 VERSION=latest
 container_name=myscrapers
 
-.PHONY: build bin-linux-amd64 start stop debug
+.PHONY: build bin-linux-amd64 start stop debug setup lint
 
 build:
 	docker build -t $(container_name):$(VERSION) -f build/Dockerfile .
@@ -26,3 +26,13 @@ debug:
 clean:
 	sudo rm -rf deployment/browser/*
 	touch deployment/browser/.gitkeep
+
+setup:
+	go mod download
+	go mod tidy
+	go install honnef.co/go/tools/cmd/staticcheck@latest
+
+lint:
+	(! gofmt -s -d . | grep '^')
+	go vet ./...
+	staticcheck ./...
