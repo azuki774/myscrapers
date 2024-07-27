@@ -9,7 +9,7 @@ on:
       - "**"
 
 jobs:
-  test:
+  e2e:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4

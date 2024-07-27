@@ -11,14 +11,21 @@ import (
 	"github.com/go-rod/rod/lib/utils"
 )
 
+const defaultOutputDir = "/data"
+
 type testGitHub struct { // for test
-	common  ScenarioCommon
-	browser *rod.Browser
+	common    ScenarioCommon
+	browser   *rod.Browser
+	outputDir string
 }
 
 func NewTestGitHub() *testGitHub {
+	outputDir := os.Getenv("outputDir")
+	if outputDir == "" {
+		outputDir = defaultOutputDir
+	}
 	return &testGitHub{
-		common: ScenarioCommon{ws: os.Getenv("wsAddr"), outputDir: "/data"},
+		common: ScenarioCommon{ws: os.Getenv("wsAddr"), outputDir: outputDir},
 	}
 }
 func (t *testGitHub) getBrowser(ctx context.Context) {
