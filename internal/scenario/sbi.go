@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/go-rod/rod"
@@ -16,6 +17,10 @@ type ScenarioSBI struct {
 	browser *rod.Browser
 	user    string
 	pass    string
+	// result
+
+	Headers []string
+	Bodies  [][]string
 }
 
 func NewScenarioSBI() (*ScenarioSBI, error) {
@@ -66,31 +71,61 @@ func (s *ScenarioSBI) Start(ctx context.Context) error {
 	}
 	defer s.browser.Close()
 
-	slog.Info("load login page")
-	page := s.browser.MustPage(loginUrl)
+	slog.Info("load login page start")
+	page := s.browser.MustPage(loginUrl).MustWaitStable()
+	slog.Info("load login page complete")
 
 	el, err := page.ElementX("//*[@id='market_top_pain']/div[6]/div[2]/table[1]")
 	if err != nil {
 		return err
 	}
 
-	fmt.Println(page.MustHTML())
+	slog.Info("get elements start")
 
-	slog.Info("get elements")
-
+	// header
 	items, err := el.Elements("th")
 	if err != nil {
 		return err
 	}
 
-	slog.Info("get th elements")
-
 	for _, item := range items {
-		t, err := item.Timeout(30 * time.Second).Text()
+		t, err := item.Timeout(10 * time.Second).Text()
 		if err != nil {
 			return err
 		}
-		fmt.Println(t)
+		s.Headers = append(s.Headers, t)
 	}
+
+	// body
+	items, err = el.Elements("td")
+	if err != nil {
+		return err
+	}
+
+	var tmpBody []string
+	for _, item := range items {
+		t, err := item.Timeout(10 * time.Second).Text()
+		if err != nil {
+			return err
+		}
+		// 改行は半角スペースに
+		t = strings.ReplaceAll(t, "\n", " ")
+		tmpBody = append(tmpBody, t)
+	}
+
+	headerLen := len(s.Headers)
+	BodiesLen := len(tmpBody) / len(s.Headers) // TODO: validation
+	for i := 0; i < BodiesLen; i++ {
+		var insertBody []string
+		for j := 0; j < headerLen; j++ {
+			insertBody = append(insertBody, tmpBody[i*headerLen+j])
+		}
+		s.Bodies = append(s.Bodies, insertBody)
+	}
+
+	slog.Info("get elements complete")
+	fmt.Println(s.Headers)
+	fmt.Println("-----------------------------")
+	fmt.Println(s.Bodies)
 	return nil
 }
