@@ -23,4 +23,4 @@ jobs:
       run: make setup
 
     - name: go test
-      run: go test
+      run: make test
