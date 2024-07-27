@@ -1,0 +1,8 @@
+services:
+  myscrapers-test-github:
+    image: myscrapers
+    container_name: myscrapers-test-github
+    environment:
+      - wsAddr=127.0.0.1:7317 # your value
+    volumes:
+      - ./browser/:/data/
