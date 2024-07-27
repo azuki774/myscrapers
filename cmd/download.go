@@ -38,14 +38,21 @@ func startDownload(opts downloadArgsOpt) (err error) {
 	slog.Info("show config", "sitename", opts.SiteName)
 	switch opts.SiteName {
 	case "sbi":
-		fmt.Println("not yet implemented")
-		return fmt.Errorf("not yet implemented")
+		sc, err := scenario.NewScenarioSBI()
+		if err != nil {
+			return err
+		}
+		if err = sc.Start(ctx); err != nil {
+			slog.Error("failed to scrape", "err", err.Error())
+			return err
+		}
 	case "test-github":
 		sc := scenario.NewTestGitHub()
 		return sc.Start(ctx)
 	default:
 		return fmt.Errorf("unknown website")
 	}
+	return nil
 }
 
 func init() {

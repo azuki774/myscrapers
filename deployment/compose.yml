@@ -3,6 +3,6 @@ services:
     image: myscrapers
     container_name: myscrapers-test-github
     environment:
-      - wsAddr=<your blowser addr:7137>
+      - wsAddr=katarina.int.azuki.blue:7317
     volumes:
-      - ./:/data/
+      - ./browser/:/data/
