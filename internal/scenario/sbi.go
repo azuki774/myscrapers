@@ -187,7 +187,10 @@ func (s *ScenarioSBI) getPortfolio(ctx context.Context) error {
 		// filename: 0-indexed -> 1-indexed
 		// ex. 20240501_1.csv
 		fileDir := filepath.Join(s.common.outputDir, fmt.Sprintf("%s_%d.jpg", s.yyyymmdd, i+1))
-		csv.WriteFile(fileDir, headers, bodies)
+		if err := csv.WriteFile(fileDir, headers, bodies); err != nil {
+			return err
+		}
+		slog.Info("write csv complete", "outputFile", fileDir)
 	}
 
 	return nil
