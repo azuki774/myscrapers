@@ -2,7 +2,7 @@ SHELL=/bin/bash
 VERSION=latest
 container_name=myscrapers
 
-.PHONY: build bin-linux-amd64 start stop debug setup lint
+.PHONY: build bin-linux-amd64 start stop debug setup lint test
 
 build:
 	docker build -t $(container_name):$(VERSION) -f build/Dockerfile .
@@ -36,3 +36,6 @@ lint:
 	(! gofmt -s -d . | grep '^')
 	go vet ./...
 	staticcheck ./...
+
+test:
+	go test -v ./...
