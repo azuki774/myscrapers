@@ -23,5 +23,6 @@ go.work.sum
 
 build/bin/myscrapers
 deployment/browser/
+deployment/*.jpg
 
 !.gitkeep
