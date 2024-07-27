@@ -22,3 +22,6 @@ go.work
 go.work.sum
 
 build/bin/myscrapers
+deployment/browser/
+
+!.gitkeep

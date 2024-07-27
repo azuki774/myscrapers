@@ -1,13 +1,9 @@
 package scenario
 
 import (
-	"context"
 	"log/slog"
+	"os"
 )
-
-type ScenarioCommon struct {
-	outputDir string
-}
 
 type ScenarioSBI struct {
 	common ScenarioCommon
@@ -30,14 +26,8 @@ func NewScenarioSBI(outputDir, user, pass string) (*ScenarioSBI, error) {
 	}
 
 	return &ScenarioSBI{
-		common: ScenarioCommon{
-			outputDir: outputDir,
-		},
-		user: user,
-		pass: pass,
+		common: ScenarioCommon{ws: os.Getenv("wsAddr"), outputDir: "/data"},
+		user:   user,
+		pass:   pass,
 	}, nil
-}
-
-func (s *ScenarioSBI) Start(ctx context.Context) error {
-	return nil
 }

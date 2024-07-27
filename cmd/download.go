@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"os"
 	"myscrapers/internal/scenario"
+	"os"
 
 	"github.com/spf13/cobra"
 )
@@ -35,34 +35,21 @@ var downloadCmd = &cobra.Command{
 
 func startDownload(opts downloadArgsOpt) (err error) {
 	ctx := context.Background()
-	slog.Info("show config", "sitename", opts.SiteName, "outputDir", opts.OutputDir)
+	slog.Info("show config", "sitename", opts.SiteName)
 	switch opts.SiteName {
 	case "sbi":
-		user := os.Getenv("user")
-		pass := os.Getenv("pass")
-		sc, err := scenario.NewScenarioSBI(downloadArgsOption.OutputDir, user, pass)
-		if err != nil {
-			slog.Error("failed to create scenario sbi", slog.String("error", err.Error()))
-			return err
-		}
-		slog.Info("success scenario sbi")
+		fmt.Println("not yet implemented")
+		return fmt.Errorf("not yet implemented")
+	case "test-github":
+		sc := scenario.NewTestGitHub()
 		return sc.Start(ctx)
 	default:
 		return fmt.Errorf("unknown website")
 	}
-
 }
 
 func init() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{AddSource: true}))
 	slog.SetDefault(logger)
 	rootCmd.AddCommand(downloadCmd)
-
-	// Get current path
-	currPath, err := os.Getwd()
-	if err != nil {
-		panic(err)
-	}
-
-	downloadCmd.Flags().StringVarP(&downloadArgsOption.OutputDir, "output", "o", currPath, "output directory")
 }
