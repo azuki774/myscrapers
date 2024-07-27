@@ -8,4 +8,5 @@ RUN make bin-linux-amd64
 FROM busybox:latest as runner
 RUN mkdir -p /usr/local/bin && mkdir -p /data/
 COPY --from=builder /app/build/bin/myscrapers /usr/local/bin/myscrapers
-CMD [ "/usr/local/bin/myscrapers", "download" ,"test-github"]
+COPY --chmod=755 build/sbi/main.sh /usr/local/bin/main.sh
+ENTRYPOINT ["/usr/local/bin/main.sh"]
