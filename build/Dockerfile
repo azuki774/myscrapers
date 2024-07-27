@@ -2,7 +2,7 @@ FROM golang:1.21.0 as builder
 
 COPY . /app/
 WORKDIR /app
-RUN make setup
+RUN go mod download
 RUN make bin-linux-amd64
 
 FROM busybox:latest as runner

@@ -2,6 +2,8 @@ package scenario
 
 import (
 	"context"
+	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -41,8 +43,13 @@ func (t *testGitHub) getBrowser(ctx context.Context) {
 }
 
 func (t *testGitHub) Start(ctx context.Context) error {
+	defer func() {
+		if rec := recover(); rec != nil {
+			slog.Error("panic occured", "err", fmt.Errorf("%v", rec))
+		}
+	}()
 	t.getBrowser(ctx)
-	defer t.browser.MustClose()
+	t.browser.MustClose()
 
 	page := t.browser.MustPage("https://github.com/").MustSetViewport(1920, 1080, 0, false).MustWaitLoad()
 	img, err := page.Screenshot(true, &proto.PageCaptureScreenshot{
