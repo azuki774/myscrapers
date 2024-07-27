@@ -1,21 +1,32 @@
 package scenario
 
 import (
+	"context"
+	"fmt"
 	"log/slog"
 	"os"
+	"time"
+
+	"github.com/go-rod/rod"
+	"github.com/go-rod/rod/lib/launcher"
 )
 
 type ScenarioSBI struct {
-	common ScenarioCommon
-	user   string
-	pass   string
+	common  ScenarioCommon
+	browser *rod.Browser
+	user    string
+	pass    string
 }
 
-func NewScenarioSBI(outputDir, user, pass string) (*ScenarioSBI, error) {
+func NewScenarioSBI() (*ScenarioSBI, error) {
+	outputDir := os.Getenv("outputDir")
+	user := os.Getenv("user")
+	pass := os.Getenv("pass")
+
 	if outputDir == "" {
-		slog.Error("outputDir required")
-		return nil, ErrorInvalidOption
+		outputDir = defaultOutputDir
 	}
+
 	if user == "" {
 		slog.Error("user required")
 		return nil, ErrorInvalidOption
@@ -30,4 +41,56 @@ func NewScenarioSBI(outputDir, user, pass string) (*ScenarioSBI, error) {
 		user:   user,
 		pass:   pass,
 	}, nil
+}
+
+func (s *ScenarioSBI) getBrowser(ctx context.Context) error {
+	l, err := launcher.NewManaged("ws://" + s.common.ws)
+	if err != nil {
+		return err
+	}
+	// You can also set any flag remotely before you launch the remote browser.
+	// Available flags: https://peter.sh/experiments/chromium-command-line-switches
+	l.Set("disable-gpu").Delete("disable-gpu")
+
+	// Launch with headful mode
+	l.Headless(true).XVFB("--server-num=5", "--server-args=-screen 0 1600x900x16")
+
+	s.browser = rod.New().Client(l.MustClient()).MustConnect()
+	return nil
+}
+
+func (s *ScenarioSBI) Start(ctx context.Context) error {
+	loginUrl := "https://site1.sbisec.co.jp/ETGate/?_ControlID=WPLETmgR001Control&_PageID=WPLETmgR001Mdtl20&_DataStoreID=DSWPLETmgR001Control&_ActionID=DefaultAID&burl=iris_top&cat1=market&cat2=top&dir=tl1-top%7Ctl2-map%7Ctl5-jpn&file=index.html&getFlg=on"
+	if err := s.getBrowser(ctx); err != nil {
+		return err
+	}
+	defer s.browser.Close()
+
+	slog.Info("load login page")
+	page := s.browser.MustPage(loginUrl)
+
+	el, err := page.ElementX("//*[@id='market_top_pain']/div[6]/div[2]/table[1]")
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(page.MustHTML())
+
+	slog.Info("get elements")
+
+	items, err := el.Elements("th")
+	if err != nil {
+		return err
+	}
+
+	slog.Info("get th elements")
+
+	for _, item := range items {
+		t, err := item.Timeout(30 * time.Second).Text()
+		if err != nil {
+			return err
+		}
+		fmt.Println(t)
+	}
+	return nil
 }

@@ -4,15 +4,15 @@ container_name=myscrapers
 
 .PHONY: build bin-linux-amd64 start stop debug setup lint test
 
-build:
-	docker build -t $(container_name):$(VERSION) -f build/Dockerfile .
-
 bin-linux-amd64:
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -tags "netgo" -installsuffix netgo  -ldflags="-s -w -extldflags \"-static\" \
 	-X main.version=$(git describe --tag --abbrev=0) \
 	-X main.revision=$(git rev-list -1 HEAD) \
 	-X main.build=$(git describe --tags)" \
 	-o build/bin/ ./...
+
+build:
+	docker build -t $(container_name):$(VERSION) -f build/Dockerfile .
 
 start:
 	docker compose -f deployment/compose.yml up -d

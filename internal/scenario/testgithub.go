@@ -49,7 +49,7 @@ func (t *testGitHub) Start(ctx context.Context) error {
 		}
 	}()
 	t.getBrowser(ctx)
-	t.browser.MustClose()
+	defer t.browser.MustClose()
 
 	page := t.browser.MustPage("https://github.com/").MustSetViewport(1920, 1080, 0, false).MustWaitLoad()
 	img, err := page.Screenshot(true, &proto.PageCaptureScreenshot{
