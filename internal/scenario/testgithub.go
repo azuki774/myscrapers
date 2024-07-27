@@ -44,8 +44,8 @@ func (t *testGitHub) Start(ctx context.Context) error {
 		Clip: &proto.PageViewport{
 			X:      0,
 			Y:      0,
-			Width:  1920,
-			Height: 1080,
+			Width:  1280,
+			Height: 720,
 
 			Scale: 2,
 		},
