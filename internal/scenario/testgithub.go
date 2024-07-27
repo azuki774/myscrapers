@@ -12,7 +12,8 @@ import (
 )
 
 type testGitHub struct { // for test
-	common ScenarioCommon
+	common  ScenarioCommon
+	browser *rod.Browser
 }
 
 func NewTestGitHub() *testGitHub {
@@ -20,10 +21,7 @@ func NewTestGitHub() *testGitHub {
 		common: ScenarioCommon{ws: os.Getenv("wsAddr"), outputDir: "/data"},
 	}
 }
-
-func (t *testGitHub) Start(ctx context.Context) error {
-	// browser := rod.New().MustConnect()
-	// defer browser.MustClose()
+func (t *testGitHub) getBrowser(ctx context.Context) {
 	l := launcher.MustNewManaged("ws://" + t.common.ws)
 
 	// You can also set any flag remotely before you launch the remote browser.
@@ -31,10 +29,16 @@ func (t *testGitHub) Start(ctx context.Context) error {
 	l.Set("disable-gpu").Delete("disable-gpu")
 
 	// Launch with headful mode
-	l.Headless(true).XVFB("--server-num=5", "--server-args=-screen 0 1600x900x16")
+	l.Headless(false).XVFB("--server-num=5", "--server-args=-screen 0 1600x900x16")
 
-	browser := rod.New().Client(l.MustClient()).MustConnect()
-	page := browser.MustPage("https://github.com/").MustSetViewport(1920, 1080, 0, false).MustWaitLoad()
+	t.browser = rod.New().Client(l.MustClient()).MustConnect()
+}
+
+func (t *testGitHub) Start(ctx context.Context) error {
+	t.getBrowser(ctx)
+	defer t.browser.MustClose()
+
+	page := t.browser.MustPage("https://github.com/").MustSetViewport(1920, 1080, 0, false).MustWaitLoad()
 	img, err := page.Screenshot(true, &proto.PageCaptureScreenshot{
 		Format: proto.PageCaptureScreenshotFormatPng,
 		Clip: &proto.PageViewport{
@@ -45,9 +49,7 @@ func (t *testGitHub) Start(ctx context.Context) error {
 
 			Scale: 2,
 		},
-		CaptureBeyondViewport: true,
-		OptimizeForSpeed:      true,
-		FromSurface:           true,
+		FromSurface: true,
 	})
 	if err != nil {
 		return err
