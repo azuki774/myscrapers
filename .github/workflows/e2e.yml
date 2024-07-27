@@ -26,6 +26,7 @@ jobs:
       run: build/bin/myscrapers download test-github
       env:
         wsAddr: "localhost:7317"
+        outputDir: "."
     services:
       go-rod:
         image: ghcr.io/go-rod/rod:v0.116.2

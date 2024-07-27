@@ -16,7 +16,6 @@ const defaultOutputDir = "/data"
 type testGitHub struct { // for test
 	common    ScenarioCommon
 	browser   *rod.Browser
-	outputDir string
 }
 
 func NewTestGitHub() *testGitHub {
