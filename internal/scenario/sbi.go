@@ -4,14 +4,18 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"myscrapers/internal/csv"
 	"os"
-	"strings"
+	"path/filepath"
 	"time"
 
 	"github.com/go-rod/rod"
+	"github.com/go-rod/rod/lib/input"
 	"github.com/go-rod/rod/lib/launcher"
+	"github.com/go-rod/rod/lib/proto"
+	"github.com/go-rod/rod/lib/utils"
 )
+
+const sbiLoginURL = "https://site1.sbisec.co.jp/ETGate/"
 
 type ScenarioSBI struct {
 	common  ScenarioCommon
@@ -43,7 +47,7 @@ func NewScenarioSBI() (*ScenarioSBI, error) {
 	}
 
 	return &ScenarioSBI{
-		common: ScenarioCommon{ws: os.Getenv("wsAddr"), outputDir: "/data"},
+		common: ScenarioCommon{ws: os.Getenv("wsAddr"), outputDir: outputDir},
 		user:   user,
 		pass:   pass,
 	}, nil
@@ -66,69 +70,51 @@ func (s *ScenarioSBI) getBrowser(ctx context.Context) error {
 }
 
 func (s *ScenarioSBI) Start(ctx context.Context) error {
-	loginUrl := "https://site1.sbisec.co.jp/ETGate/?_ControlID=WPLETmgR001Control&_PageID=WPLETmgR001Mdtl20&_DataStoreID=DSWPLETmgR001Control&_ActionID=DefaultAID&burl=iris_top&cat1=market&cat2=top&dir=tl1-top%7Ctl2-map%7Ctl5-jpn&file=index.html&getFlg=on"
 	if err := s.getBrowser(ctx); err != nil {
 		return err
 	}
 	defer s.browser.Close()
 
-	slog.Info("load login page start")
-	page := s.browser.MustPage(loginUrl).MustWaitStable()
-	slog.Info("load login page complete")
+	slog.Info("load loginpage start")
+	page := s.browser.MustPage(sbiLoginURL).MustWaitStable()
+	slog.Info("load loginpage complete")
 
-	el, err := page.ElementX("//*[@id='market_top_pain']/div[6]/div[2]/table[1]")
+	slog.Info("login information input")
+	// ID入力
+	loginField, err := page.Timeout(10 * time.Second).Element(`[name="user_id"]`)
 	if err != nil {
 		return err
 	}
+	loginField.MustInput(s.user)
+	fmt.Println(loginField.MustText())
 
-	slog.Info("get elements start")
-
-	// header
-	items, err := el.Elements("th")
+	// パスワード入力
+	passField, err := page.Timeout(10 * time.Second).Element(`[name="user_password"]`)
 	if err != nil {
 		return err
 	}
+	passField.MustInput(s.pass).MustType(input.Enter) // Enter キーでそのまま送信
+	page.MustWaitStable()
 
-	for _, item := range items {
-		t, err := item.Timeout(10 * time.Second).Text()
-		if err != nil {
-			return err
-		}
-		s.Headers = append(s.Headers, t)
-	}
+	page = s.browser.MustPage("https://site1.sbisec.co.jp/ETGate/?_ControlID=WPLETpfR001Control&_PageID=DefaultPID&_DataStoreID=DSWPLETpfR001Control&_ActionID=DefaultAID&getFlg=on").MustWaitStable()
+	img, err := page.Screenshot(true, &proto.PageCaptureScreenshot{
+		Format: proto.PageCaptureScreenshotFormatPng,
+		Clip: &proto.PageViewport{
+			X:      0,
+			Y:      0,
+			Width:  1600,
+			Height: 900,
 
-	// body
-	items, err = el.Elements("td")
+			Scale: 2,
+		},
+		FromSurface: true,
+	})
 	if err != nil {
 		return err
 	}
-
-	var tmpBody []string
-	for _, item := range items {
-		t, err := item.Timeout(10 * time.Second).Text()
-		if err != nil {
-			return err
-		}
-		// 改行は半角スペースに
-		t = strings.ReplaceAll(t, "\n", " ")
-		tmpBody = append(tmpBody, t)
+	err = utils.OutputFile(filepath.Join(s.common.outputDir, "screenshot.jpg"), img)
+	if err != nil {
+		return err
 	}
-
-	headerLen := len(s.Headers)
-	BodiesLen := len(tmpBody) / len(s.Headers) // TODO: validation
-	for i := 0; i < BodiesLen; i++ {
-		var insertBody []string
-		for j := 0; j < headerLen; j++ {
-			insertBody = append(insertBody, tmpBody[i*headerLen+j])
-		}
-		s.Bodies = append(s.Bodies, insertBody)
-	}
-
-	slog.Info("get elements complete")
-	fmt.Println(s.Headers)
-	fmt.Println("-----------------------------")
-	fmt.Println(s.Bodies)
-
-	csv.WriteFile("./output.csv", s.Headers, s.Bodies)
 	return nil
 }
