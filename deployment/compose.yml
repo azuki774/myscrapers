@@ -1,8 +1,17 @@
 services:
-  myscrapers-test-github:
-    image: myscrapers
-    container_name: myscrapers-test-github
+  myscrapers-sbi-test:
+    image: myscrapers:latest
+    container_name: myscrapers-sbi-test
     environment:
-      - wsAddr=127.0.0.1:7317 # your value
+      - wsAddr=127.0.0.1:7317 # your browser value
+      - TZ="JST-9"
+      # - BUCKET_NAME=azk-system-stg-bucket # from env (ex: hoge-system-stg-bucket)
+      # - BUCKET_URL=https://s3.ap-northeast-1.wasabisys.com # if you set, fetch data will be updated
+      # - BUCKET_DIR=myscrapers/sbi/
+      # - AWS_REGION=ap-northeast-1
+      # - AWS_ACCESS_KEY_ID=*** # your value
+      # - AWS_SECRET_ACCESS_KEY=*** # your value
+      - user=*** # your sbi user
+      - pass=*** # your sbi pass
     volumes:
       - ./browser/:/data/
