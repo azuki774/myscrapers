@@ -13,7 +13,6 @@ import (
 	"github.com/go-rod/rod/lib/input"
 	"github.com/go-rod/rod/lib/launcher"
 	"github.com/go-rod/rod/lib/proto"
-	"github.com/go-rod/rod/lib/utils"
 )
 
 const sbiLoginURL = "https://site1.sbisec.co.jp/ETGate/"
@@ -22,16 +21,18 @@ const portfolioURL = "https://site1.sbisec.co.jp/ETGate/?_ControlID=WPLETpfR001C
 const portfolioFieldSize = 12
 
 type ScenarioSBI struct {
-	common  ScenarioCommon
-	browser *rod.Browser
-	user    string
-	pass    string
+	common   ScenarioCommon
+	browser  *rod.Browser
+	user     string
+	pass     string
+	yyyymmdd string
 }
 
 func NewScenarioSBI() (*ScenarioSBI, error) {
 	outputDir := os.Getenv("outputDir")
 	user := os.Getenv("user")
 	pass := os.Getenv("pass")
+	yyyymmdd := time.Now().Format("20060102")
 
 	if outputDir == "" {
 		outputDir = defaultOutputDir
@@ -47,9 +48,10 @@ func NewScenarioSBI() (*ScenarioSBI, error) {
 	}
 
 	return &ScenarioSBI{
-		common: ScenarioCommon{ws: os.Getenv("wsAddr"), outputDir: outputDir},
-		user:   user,
-		pass:   pass,
+		common:   ScenarioCommon{ws: os.Getenv("wsAddr"), outputDir: outputDir},
+		user:     user,
+		pass:     pass,
+		yyyymmdd: yyyymmdd,
 	}, nil
 }
 
@@ -98,8 +100,8 @@ func (s *ScenarioSBI) login(ctx context.Context) error {
 func (s *ScenarioSBI) getPortfolio(ctx context.Context) error {
 	// ポートフォリオページに移動
 	slog.Info("move Portfolio page")
-	page := s.browser.Timeout(30 * time.Second).MustPage(portfolioURL).MustWaitStable()
-	img, err := page.Screenshot(true, &proto.PageCaptureScreenshot{
+	page := s.browser.MustPage(portfolioURL).MustWaitStable()
+	_, err := page.Screenshot(true, &proto.PageCaptureScreenshot{
 		Format: proto.PageCaptureScreenshotFormatPng,
 		Clip: &proto.PageViewport{
 			X:      0,
@@ -114,10 +116,10 @@ func (s *ScenarioSBI) getPortfolio(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	err = utils.OutputFile(filepath.Join(s.common.outputDir, "screenshot.jpg"), img)
-	if err != nil {
-		return err
-	}
+	// err = utils.OutputFile(filepath.Join(s.common.outputDir, fmt.Sprintf("%s_pic.jpg", s.yyyymmdd)), img)
+	// if err != nil {
+	// 	return err
+	// }
 
 	tables1 := page.MustElements("tbody") // table1: tbody を全部抜き出し
 	var tables2 []rod.Elements            // table2: ポートフォリオテーブルのみ抜き出し
@@ -135,6 +137,12 @@ func (s *ScenarioSBI) getPortfolio(ctx context.Context) error {
 		}
 		slog.Info("datected Portfolio table")
 		tables2 = append(tables2, val)
+	}
+
+	if len(tables2) == 0 {
+		// 1つもテーブルが見つからなかった場合、ログインに失敗していそう
+		slog.Warn("portfolio table not found. perhaps login not sucessfully")
+		return fmt.Errorf("portfolio table not found")
 	}
 
 	// 1テーブルごとに処理
@@ -181,7 +189,14 @@ func (s *ScenarioSBI) getPortfolio(ctx context.Context) error {
 		fmt.Println(headers)
 		fmt.Println("show body")
 		fmt.Println(bodies)
-		csv.WriteFile(fmt.Sprintf("./portfolio_%d.csv", i+1), headers, bodies) // filename: 0-indexed -> 1-indexed
+
+		// filename: 0-indexed -> 1-indexed
+		// ex. 20240501_1.csv
+		fileDir := filepath.Join(s.common.outputDir, fmt.Sprintf("%s_%d.csv", s.yyyymmdd, i+1))
+		if err := csv.WriteFile(fileDir, headers, bodies); err != nil {
+			return err
+		}
+		slog.Info("write csv complete", "outputFile", fileDir)
 	}
 
 	return nil
