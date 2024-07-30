@@ -61,10 +61,12 @@ func (i *ImporterCF) Start(ctx context.Context) (err error) {
 		slog.Error("failed to get cfDetailTable")
 		return err
 	}
-	fmt.Println(cfDetailTable)
+
 	ths := cfDetailTable.MustElements("th")
 
 	var header []string
+	var bodies [][]string
+
 	for _, th := range ths {
 		// セレクターの選択肢のテキストを消す
 		txt := strings.Split(th.MustText(), " ")[0]
@@ -74,6 +76,31 @@ func (i *ImporterCF) Start(ctx context.Context) (err error) {
 		txt = strings.ReplaceAll(txt, " ", "")
 		header = append(header, txt)
 	}
+	fmt.Println(len(header))
 	fmt.Println(header)
+
+	recordRows, err := cfDetailTable.Elements(`[class="transaction_list js-cf-edit-container target-active"`)
+	if err != nil {
+		slog.Error("failed to get recordRows")
+		return err
+	}
+
+	for _, recordRow := range recordRows {
+		var row []string
+		spans := recordRow.MustElements("td")
+		for _, span := range spans {
+			// セレクターの選択肢のテキストを消す
+			txt := strings.Split(span.MustText(), " ")[0]
+			// 改行を消す
+			txt = strings.ReplaceAll(txt, "\n", "")
+			// 無駄な空白を消す
+			txt = strings.ReplaceAll(txt, " ", "")
+			row = append(row, txt)
+		}
+		bodies = append(bodies, row)
+		fmt.Println(len(row))
+	}
+	fmt.Println(bodies)
+
 	return nil
 }
