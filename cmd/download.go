@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"myscrapers/internal/scenario"
-	"os"
 
 	"github.com/spf13/cobra"
 )
@@ -56,7 +55,5 @@ func startDownload(opts downloadArgsOpt) (err error) {
 }
 
 func init() {
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{AddSource: true}))
-	slog.SetDefault(logger)
 	rootCmd.AddCommand(downloadCmd)
 }
