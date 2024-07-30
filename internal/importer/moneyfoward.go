@@ -2,9 +2,10 @@ package importer
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
+	"myscrapers/internal/csv"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -49,23 +50,20 @@ func (i *ImporterCF) getBrowser(ctx context.Context) error {
 	i.browser = rod.New().Client(l.MustClient()).MustConnect()
 	return nil
 }
-func (i *ImporterCF) Start(ctx context.Context) (err error) {
-	if err := i.getBrowser(ctx); err != nil {
-		slog.Error("failed to get browser")
-		return err
-	}
 
-	page := i.browser.MustPage(i.inputCFFile).MustWaitStable()
-	cfDetailTable, err := page.Element(`[id=cf-detail-table]`)
+// cfPage は /cf のページを rod で取得したもの
+func (i *ImporterCF) getHeader(ctx context.Context, cfPage *rod.Page) (header []string, err error) {
+	cfDetailTable, err := cfPage.Element(`[id=cf-detail-table]`)
 	if err != nil {
-		slog.Error("failed to get cfDetailTable")
-		return err
+		slog.Error("failed to get cf-detail-table")
+		return []string{}, err
 	}
-
 	ths := cfDetailTable.MustElements("th")
 
-	var header []string
-	var bodies [][]string
+	if err != nil {
+		slog.Error("failed to get cfDetailTable")
+		return []string{}, err
+	}
 
 	for _, th := range ths {
 		// セレクターの選択肢のテキストを消す
@@ -77,10 +75,21 @@ func (i *ImporterCF) Start(ctx context.Context) (err error) {
 		header = append(header, txt)
 	}
 
+	return header, nil
+}
+
+// cfPage は /cf のページを rod で取得したもの
+func (i *ImporterCF) getBody(ctx context.Context, cfPage *rod.Page) (bodies [][]string, err error) {
+	cfDetailTable, err := cfPage.Element(`[id=cf-detail-table]`)
+	if err != nil {
+		slog.Error("failed to get cf-detail-table")
+		return [][]string{}, err
+	}
+
 	recordRows, err := cfDetailTable.Elements(`[class="transaction_list js-cf-edit-container target-active"`) // 1行ごとのrecordsのフィールドを特定する
 	if err != nil {
 		slog.Error("failed to get recordRows")
-		return err
+		return [][]string{}, err
 	}
 
 	for _, recordRow := range recordRows {
@@ -91,11 +100,48 @@ func (i *ImporterCF) Start(ctx context.Context) (err error) {
 			txt := strings.Split(span.MustText(), " ")[0]
 			// 改行を消す
 			txt = strings.ReplaceAll(txt, "\n", "")
-			// 無駄な空白を消す
-			txt = strings.ReplaceAll(txt, " ", "")
+			// 無駄な空白を消さない
 			row = append(row, txt)
 		}
 		bodies = append(bodies, row)
 	}
+
+	return bodies, nil
+}
+
+func (i *ImporterCF) Start(ctx context.Context) (err error) {
+	if err := i.getBrowser(ctx); err != nil {
+		slog.Error("failed to get browser")
+		return err
+	}
+
+	page := i.browser.MustPage(i.inputCFFile).MustWaitStable()
+
+	var header []string
+	var bodies [][]string
+
+	header, err = i.getHeader(ctx, page)
+	if err != nil {
+		slog.Error("failed to get header")
+		return err
+	}
+
+	bodies, err = i.getBody(ctx, page)
+	if err != nil {
+		slog.Error("failed to get bodies")
+		return err
+	}
+
+	// validation
+	if err := csv.ValidateCF(header, bodies); err != nil {
+		return err
+	}
+
+	// csv書き込み
+	if err := csv.WriteFile(filepath.Join(i.common.outputDir, "output.csv"), header, bodies); err != nil {
+		slog.Error("failed to output csv")
+		return err
+	}
+	slog.Info("output csv complete")
 	return nil
 }
