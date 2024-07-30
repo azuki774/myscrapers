@@ -1,6 +1,7 @@
 SHELL=/bin/bash
 VERSION=latest
-container_name=myscrapers
+container_name_sbi=myscrapers-sbi
+container_name_mf=myscrapers-mf
 
 .PHONY: build bin-linux-amd64 start stop debug setup lint test
 
@@ -12,7 +13,8 @@ bin-linux-amd64:
 	-o build/bin/ ./...
 
 build:
-	docker build -t $(container_name):$(VERSION) -f build/sbi/Dockerfile .
+	docker build -t $(container_name_sbi):$(VERSION) -f build/sbi/Dockerfile .
+	docker build -t $(container_name_mf):$(VERSION) -f build/moneyforward/Dockerfile .
 
 start:
 	docker compose -f deployment/compose.yml up -d

@@ -5,22 +5,34 @@ YYYYMMDD=`date '+%Y%m%d'`
 
 # BUCKET_URL # from env (ex: "https://s3.ap-northeast-1.wasabisys.com")
 # BUCKET_NAME # from env (ex: hoge-system-stg-bucket)
-# BUCKET_DIR # from env (ex: fetcher/sbi)
+# BUCKET_DIR # from env (ex: fetcher/moneyforward)
 # AWS_REGION # from env (ex: ap-northeast-1)
 # AWS_ACCESS_KEY_ID # from env
 # AWS_SECRET_ACCESS_KEY # from env
+# user="xxxxxxxxx" # moneyforward id  , from env
+# pass="yyyyyyyyy" # moneyforward pass, from env
 # wsAddr # from env (ex: localhost:7327)
 
 SCRAPERS_BIN="/usr/local/bin/myscrapers"
 AWS_BIN="/usr/local/bin/aws/dist/aws"
-DATA_DIR="/data"
+outputDir="/data/${YYYYMM}/${YYYYMMDD}"
 
-REMOTE_DIR="${BUCKET_DIR}/${YYYYMM}"
+REMOTE_DIR="${BUCKET_DIR}/${YYYYMM}/${YYYYMMDD}"
 
-function fetch () {
+function download () {
     echo "fetcher start"
-    ${SCRAPERS_BIN} download sbi
+    ${SCRAPERS_BIN} download moneyforward --lastmonth # TODO
     echo "fetcher complete"
+}
+
+# CSVファイル作成
+function import () {
+    echo "import start"
+    inputCfFile=${outputDir}/cf.html           ${SCRAPERS_BIN} import moneyforward-cf # 今月分
+    inputCfFile=${outputDir}/cf_lastmonth.html ${SCRAPERS_BIN} import moneyforward-cf # 先月分
+    echo "output CSV: ${outputDir}/cf.csv"
+    echo "output CSV: ${outputDir}/cf_lastmonth.csv"
+    echo "import complete"
 }
 
 function create_s3_credentials () {
@@ -42,14 +54,12 @@ function create_s3_credentials () {
 
 function s3_upload () {
     echo "s3 upload start"
-    mkdir -p ${DATA_DIR}/${YYYYMM}
-    cp -f ${DATA_DIR}/*.csv ${DATA_DIR}/${YYYYMM}/ # ex. $DATA_DIR/YYYYMMDD_1.csv -> $DATA_DIR/$YYYYMM/YYYYMMDD_1.csv
-    rm ${DATA_DIR}/*.csv
-    ${AWS_BIN} s3 cp ${DATA_DIR}/${YYYYMM}/ "s3://${BUCKET_NAME}/${REMOTE_DIR}" --recursive --endpoint-url="${BUCKET_URL}"
+    ${AWS_BIN} s3 cp ${outputDir}/ "s3://${BUCKET_NAME}/${REMOTE_DIR}" --recursive --endpoint-url="${BUCKET_URL}"
     echo "s3 upload complete"
 }
 
-fetch
+download
+import
 
 if [ -z $BUCKET_NAME ]; then
     exit 0

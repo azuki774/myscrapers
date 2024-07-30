@@ -46,6 +46,7 @@ func startDownload(opts downloadArgsOpt) (err error) {
 			slog.Error("failed to scrape", "err", err.Error())
 			return err
 		}
+		slog.Info("download sbi complete")
 	case "moneyforward":
 		mf, err := scenario.NewScenarioMoneyForward(downloadArgsOption.LastMonth)
 		if err != nil {
@@ -55,6 +56,7 @@ func startDownload(opts downloadArgsOpt) (err error) {
 			slog.Error("failed to scrape", "err", err.Error())
 			return err
 		}
+		slog.Info("download moneyforward complete")
 	case "test-github":
 		sc := scenario.NewTestGitHub()
 		return sc.Start(ctx)

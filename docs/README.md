@@ -10,4 +10,4 @@
 ```
 
 ### 出力先
-- コンテナ内デフォルト: `/data/YYYYMM/YYYYMMDD/cf.csv`
+- コンテナ内デフォルト: `/data/YYYYMM/YYYYMMDD/cf.csv`, `--lastmonth` 付与時は、`/data/YYYYMM/YYYYMMDD/cf_lastmonth.csv` も出力。
