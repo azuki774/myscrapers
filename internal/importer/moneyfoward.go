@@ -76,10 +76,8 @@ func (i *ImporterCF) Start(ctx context.Context) (err error) {
 		txt = strings.ReplaceAll(txt, " ", "")
 		header = append(header, txt)
 	}
-	fmt.Println(len(header))
-	fmt.Println(header)
 
-	recordRows, err := cfDetailTable.Elements(`[class="transaction_list js-cf-edit-container target-active"`)
+	recordRows, err := cfDetailTable.Elements(`[class="transaction_list js-cf-edit-container target-active"`) // 1行ごとのrecordsのフィールドを特定する
 	if err != nil {
 		slog.Error("failed to get recordRows")
 		return err
@@ -87,7 +85,7 @@ func (i *ImporterCF) Start(ctx context.Context) (err error) {
 
 	for _, recordRow := range recordRows {
 		var row []string
-		spans := recordRow.MustElements("td")
+		spans := recordRow.MustElements("td") // 1行ごとのレコードから各セルを抽出
 		for _, span := range spans {
 			// セレクターの選択肢のテキストを消す
 			txt := strings.Split(span.MustText(), " ")[0]
@@ -98,9 +96,6 @@ func (i *ImporterCF) Start(ctx context.Context) (err error) {
 			row = append(row, txt)
 		}
 		bodies = append(bodies, row)
-		fmt.Println(len(row))
 	}
-	fmt.Println(bodies)
-
 	return nil
 }
