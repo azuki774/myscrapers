@@ -13,6 +13,8 @@ import (
 	"github.com/go-rod/rod/lib/launcher"
 )
 
+const cfFileName = "cf.csv"
+
 type ImporterCF struct {
 	common      ImporterCommon
 	browser     *rod.Browser
@@ -31,7 +33,7 @@ func NewImporterCF(ctx context.Context) (*ImporterCF, error) {
 	return &ImporterCF{
 		common:      ImporterCommon{ws: os.Getenv("wsAddr"), outputDir: outputDir},
 		yyyymmdd:    yyyymmdd,
-		inputCFFile: "file:///data/cf.html", // TODO
+		inputCFFile: "file:///data/cf.html", // This file is browser's local html file.
 	}, nil
 }
 
@@ -125,12 +127,14 @@ func (i *ImporterCF) Start(ctx context.Context) (err error) {
 		slog.Error("failed to get header")
 		return err
 	}
+	slog.Info("get CSV header")
 
 	bodies, err = i.getBody(ctx, page)
 	if err != nil {
 		slog.Error("failed to get bodies")
 		return err
 	}
+	slog.Info("get CSV body")
 
 	// validation
 	if err := csv.ValidateCF(header, bodies); err != nil {
@@ -138,7 +142,7 @@ func (i *ImporterCF) Start(ctx context.Context) (err error) {
 	}
 
 	// csv書き込み
-	if err := csv.WriteFile(filepath.Join(i.common.outputDir, "output.csv"), header, bodies); err != nil {
+	if err := csv.WriteFile(filepath.Join(i.common.outputDir, cfFileName), header, bodies); err != nil {
 		slog.Error("failed to output csv")
 		return err
 	}
