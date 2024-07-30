@@ -14,6 +14,7 @@ var downloadArgsOption downloadArgsOpt
 type downloadArgsOpt struct {
 	SiteName  string
 	OutputDir string
+	LastMonth bool
 }
 
 // downloadCmd represents the download command
@@ -45,6 +46,15 @@ func startDownload(opts downloadArgsOpt) (err error) {
 			slog.Error("failed to scrape", "err", err.Error())
 			return err
 		}
+	case "moneyforward":
+		mf, err := scenario.NewScenarioMoneyForward(downloadArgsOption.LastMonth)
+		if err != nil {
+			return err
+		}
+		if err = mf.Start(ctx); err != nil {
+			slog.Error("failed to scrape", "err", err.Error())
+			return err
+		}
 	case "test-github":
 		sc := scenario.NewTestGitHub()
 		return sc.Start(ctx)
@@ -56,4 +66,5 @@ func startDownload(opts downloadArgsOpt) (err error) {
 
 func init() {
 	rootCmd.AddCommand(downloadCmd)
+	downloadCmd.Flags().BoolVarP(&downloadArgsOption.LastMonth, "lastmonth", "l", true, "fetch last month") // 先月分も読み込むかどうか（月末取りこぼしを防ぐため、基本は true）
 }

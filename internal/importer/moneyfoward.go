@@ -14,26 +14,32 @@ import (
 )
 
 const cfFileName = "cf.csv"
+const defaultInputCfFile = "file:///data/cf.html" // This file is browser's local html file.
 
 type ImporterCF struct {
 	common      ImporterCommon
 	browser     *rod.Browser
 	yyyymmdd    string
-	inputCFFile string
+	inputCfFile string
 }
 
 func NewImporterCF(ctx context.Context) (*ImporterCF, error) {
 	outputDir := os.Getenv("outputDir")
 	yyyymmdd := time.Now().Format("20060102")
+	inputCfFile := os.Getenv("inputCfFile")
 
 	if outputDir == "" {
 		outputDir = defaultOutputDir
 	}
 
+	if inputCfFile == "" {
+		inputCfFile = defaultInputCfFile
+	}
+
 	return &ImporterCF{
 		common:      ImporterCommon{ws: os.Getenv("wsAddr"), outputDir: outputDir},
 		yyyymmdd:    yyyymmdd,
-		inputCFFile: "file:///data/cf.html", // This file is browser's local html file.
+		inputCfFile: inputCfFile,
 	}, nil
 }
 
@@ -60,8 +66,8 @@ func (i *ImporterCF) getHeader(ctx context.Context, cfPage *rod.Page) (header []
 		slog.Error("failed to get cf-detail-table")
 		return []string{}, err
 	}
-	ths := cfDetailTable.MustElements("th")
 
+	ths, err := cfDetailTable.Elements("th")
 	if err != nil {
 		slog.Error("failed to get cfDetailTable")
 		return []string{}, err
@@ -116,8 +122,9 @@ func (i *ImporterCF) Start(ctx context.Context) (err error) {
 		slog.Error("failed to get browser")
 		return err
 	}
-
-	page := i.browser.MustPage(i.inputCFFile).MustWaitStable()
+	slog.Error("connect to browser")
+	page := i.browser.MustPage(i.inputCfFile).MustWaitStable()
+	slog.Error("load cf page")
 
 	var header []string
 	var bodies [][]string

@@ -207,6 +207,7 @@ func (s *ScenarioSBI) Start(ctx context.Context) error {
 		return err
 	}
 	defer s.browser.Close()
+	slog.Error("connect to browser")
 
 	if err := s.login(ctx); err != nil {
 		return err
