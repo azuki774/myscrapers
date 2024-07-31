@@ -118,13 +118,14 @@ func (i *ImporterCF) getBody(ctx context.Context, cfPage *rod.Page) (bodies [][]
 }
 
 func (i *ImporterCF) Start(ctx context.Context) (err error) {
+	slog.Info("connect to browser")
 	if err := i.getBrowser(ctx); err != nil {
 		slog.Error("failed to get browser")
 		return err
 	}
-	slog.Error("connect to browser")
+
+	slog.Info("load cf page", "inputCfFile", i.inputCfFile)
 	page := i.browser.MustPage(i.inputCfFile).MustWaitStable()
-	slog.Error("load cf page")
 
 	var header []string
 	var bodies [][]string

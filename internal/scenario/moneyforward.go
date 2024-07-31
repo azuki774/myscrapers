@@ -62,7 +62,7 @@ func (s *ScenarioMoneyForward) getBrowser(ctx context.Context) error {
 	l.Set("disable-gpu").Delete("disable-gpu")
 
 	// Launch with headful mode
-	l.Headless(false).XVFB("--server-num=5", "--server-args=-screen 0 1600x900x16")
+	l.Headless(true).XVFB("--server-num=5", "--server-args=-screen 0 1600x900x16")
 
 	s.browser = rod.New().Client(l.MustClient()).MustConnect()
 	return nil
@@ -80,6 +80,7 @@ func (s *ScenarioMoneyForward) login(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
 	loginField.MustInput(s.user).MustType(input.Enter)
 
 	// ここでは画面遷移しないので WaitStableしない
@@ -111,7 +112,7 @@ func (s *ScenarioMoneyForward) pageDownload(ctx context.Context, lastmonth bool)
 		return err
 	}
 
-	slog.Info("cf download complete (this month)")
+	slog.Info("cf download complete (this month)", "outputPath", fileName)
 
 	if !lastmonth {
 		return nil
@@ -137,7 +138,7 @@ func (s *ScenarioMoneyForward) pageDownload(ctx context.Context, lastmonth bool)
 		return err
 	}
 
-	slog.Info("cf download complete (last month)")
+	slog.Info("cf download complete (last month)", "outputPath", fileNameLm)
 
 	return nil
 }
