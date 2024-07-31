@@ -9,7 +9,7 @@
 - s3ストレージにアップロードへの機能がある。
     - 環境変数 `BUCKET_NAME` があった場合、取得したデータを `s3://${BUCKET_NAME}/${REMOTE_DIR}/YYYYMMDD/` に保存。
 
-## moneyforward-cf
+## myscrapers download moneyforward
 
 ### output CSV
 例：
@@ -33,6 +33,6 @@ docker run --rm -p 7327:7327 ghcr.io/go-rod/rod:v0.116.2
 user=<your id> \
 pass=<your pass> \
 outputDir="." \
-wsAddr="localhost:7327" `
+wsAddr="localhost:7327"
 build/bin/myscrapers download moneyforward
 ```
