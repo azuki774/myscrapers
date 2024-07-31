@@ -10,6 +10,7 @@ import (
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/input"
 	"github.com/go-rod/rod/lib/launcher"
+	"github.com/go-rod/rod/lib/proto"
 )
 
 const mfCfURL = "https://moneyforward.com/cf" // also for login page without account_selector
@@ -99,6 +100,48 @@ func (s *ScenarioMoneyForward) login(ctx context.Context) error {
 	return nil
 }
 
+func (s *ScenarioMoneyForward) pageDownload(ctx context.Context, lastmonth bool) error {
+	fileName := filepath.Join(s.common.outputDir, "cf.html")
+	fileNameLm := filepath.Join(s.common.outputDir, "cf_lastmonth.html")
+
+	// this month
+	slog.Info("cf download start (this month)")
+	page := s.browser.Timeout(60 * time.Second).MustPage(mfCfURL).MustWaitStable()
+	if err := os.WriteFile(fileName, []byte(page.MustHTML()), 0644); err != nil {
+		return err
+	}
+
+	slog.Info("cf download complete (this month)")
+
+	if !lastmonth {
+		return nil
+	}
+
+	slog.Info("cf download start (last month)")
+
+	// 先月のページに移動
+	lastmonthButton, err := page.Timeout(10 * time.Second).Element(`[class="fc-button-content"]`)
+	if err != nil {
+		return err
+	}
+
+	if err := lastmonthButton.Click(proto.InputMouseButtonLeft, 1); err != nil {
+		slog.Error("failed to click lastmonth button")
+		return err
+	}
+
+	time.Sleep(10 * time.Second) // ページ遷移を待つ
+
+	// last month
+	if err := os.WriteFile(fileNameLm, []byte(page.MustHTML()), 0644); err != nil {
+		return err
+	}
+
+	slog.Info("cf download complete (last month)")
+
+	return nil
+}
+
 func (s *ScenarioMoneyForward) Start(ctx context.Context) (err error) {
 	if err := s.getBrowser(ctx); err != nil {
 		return err
@@ -107,6 +150,11 @@ func (s *ScenarioMoneyForward) Start(ctx context.Context) (err error) {
 
 	if err := s.login(ctx); err != nil {
 		slog.Error("login failed")
+		return err
+	}
+
+	if err := s.pageDownload(ctx, s.lastMonth); err != nil {
+		slog.Error("write html error")
 		return err
 	}
 
