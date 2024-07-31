@@ -69,10 +69,9 @@ func getBody(ctx context.Context, cfPage *rod.Page) (bodies [][]string, err erro
 		var row []string
 		spans := recordRow.MustElements("td") // 1行ごとのレコードから各セルを抽出
 		for _, span := range spans {
-			// セレクターの選択肢のテキストを消す
-			txt := strings.Split(span.MustText(), " ")[0]
+			// セレクターはないので何も消さない
 			// 改行を消す
-			txt = strings.ReplaceAll(txt, "\n", "")
+			txt := strings.ReplaceAll(span.MustText(), "\n", "")
 			// 無駄な空白を消さない
 			row = append(row, txt)
 		}

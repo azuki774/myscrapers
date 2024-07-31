@@ -15,38 +15,19 @@ YYYYMMDD=`date '+%Y%m%d'`
 
 SCRAPERS_BIN="/usr/local/bin/myscrapers"
 AWS_BIN="/usr/local/bin/aws/dist/aws"
-outputDir=""
+outputDir="/data/${YYYYMM}/${YYYYMMDD}"
 
 REMOTE_DIR="${BUCKET_DIR}/${YYYYMM}/${YYYYMMDD}"
 
-function init () {
-    rdmDir=`cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1`
-    outputDir="/tmp/myscrapers/${rdmDir}/${YYYYMM}/${YYYYMMDD}"
-    mkdir -p ${outputDir}
-}
-
-function clean () {
-    rm -rf ${outputDir}
-}
-
 function download () {
-    echo "fetcher start"
-    echo "output to ${outputDir}"
+    echo "job start"
+    mkdir -p ${outputDir}
+    echo "output to dir: ${outputDir}"
     outputDir=${outputDir} \
     user=${user} \
     pass=${pass} \
     ${SCRAPERS_BIN} download moneyforward --lastmonth
-    echo "fetcher complete"
-}
-
-# CSVファイル作成
-function import () {
-    echo "import start"
-    inputCfFile=file://${outputDir}/cf.html           ${SCRAPERS_BIN} import moneyforward-cf # 今月分
-    inputCfFile=file://${outputDir}/cf_lastmonth.html ${SCRAPERS_BIN} import moneyforward-cf # 先月分
-    echo "output CSV: ${outputDir}/cf.csv"
-    echo "output CSV: ${outputDir}/cf_lastmonth.csv"
-    echo "import complete"
+    echo "job complete"
 }
 
 function create_s3_credentials () {
@@ -72,18 +53,9 @@ function s3_upload () {
     echo "s3 upload complete"
 }
 
-init
 download
 
 if [ -n $BUCKET_NAME ]; then
     create_s3_credentials
     s3_upload
 fi
-
-import
-
-if [ -n $BUCKET_NAME ]; then
-    s3_upload
-fi
-
-clean
