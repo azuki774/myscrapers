@@ -3,6 +3,7 @@ package scenario
 import (
 	"context"
 	"log/slog"
+	"myscrapers/internal/moneyforward"
 	"os"
 	"path/filepath"
 	"time"
@@ -101,49 +102,20 @@ func (s *ScenarioMoneyForward) login(ctx context.Context) error {
 	return nil
 }
 
-func (s *ScenarioMoneyForward) pageDownload(ctx context.Context, lastmonth bool) error {
-	fileName := filepath.Join(s.common.outputDir, "cf.html")
-	fileNameLm := filepath.Join(s.common.outputDir, "cf_lastmonth.html")
-
-	// this month
+func (s *ScenarioMoneyForward) pageDownload(ctx context.Context, fileName string, page *rod.Page) error {
 	slog.Info("cf download start (this month)")
-	page := s.browser.Timeout(60 * time.Second).MustPage(mfCfURL).MustWaitStable()
 	if err := os.WriteFile(fileName, []byte(page.MustHTML()), 0644); err != nil {
 		return err
 	}
-
-	slog.Info("cf download complete (this month)", "outputPath", fileName)
-
-	if !lastmonth {
-		return nil
-	}
-
-	slog.Info("cf download start (last month)")
-
-	// 先月のページに移動
-	lastmonthButton, err := page.Timeout(10 * time.Second).Element(`[class="fc-button-content"]`)
-	if err != nil {
-		return err
-	}
-
-	if err := lastmonthButton.Click(proto.InputMouseButtonLeft, 1); err != nil {
-		slog.Error("failed to click lastmonth button")
-		return err
-	}
-
-	time.Sleep(10 * time.Second) // ページ遷移を待つ
-
-	// last month
-	if err := os.WriteFile(fileNameLm, []byte(page.MustHTML()), 0644); err != nil {
-		return err
-	}
-
-	slog.Info("cf download complete (last month)", "outputPath", fileNameLm)
-
 	return nil
 }
 
 func (s *ScenarioMoneyForward) Start(ctx context.Context) (err error) {
+	fileName := filepath.Join(s.common.outputDir, "cf.html")
+	fileNameLm := filepath.Join(s.common.outputDir, "cf_lastmonth.html")
+	fileNameCSV := filepath.Join(s.common.outputDir, "cf.csv")
+	fileNameLmCSV := filepath.Join(s.common.outputDir, "cf_lastmonth.csv")
+
 	if err := s.getBrowser(ctx); err != nil {
 		return err
 	}
@@ -154,10 +126,58 @@ func (s *ScenarioMoneyForward) Start(ctx context.Context) (err error) {
 		return err
 	}
 
-	if err := s.pageDownload(ctx, s.lastMonth); err != nil {
+	slog.Info("get cf page start")
+	page := s.browser.Timeout(60 * time.Second).MustPage(mfCfURL).MustWaitStable()
+	slog.Info("get cf page complete")
+
+	slog.Info("cf download start (this month)")
+	if err := s.pageDownload(ctx, fileName, page); err != nil {
 		slog.Error("write html error")
 		return err
 	}
+	slog.Info("cf download complete (this month)", "outputPath", fileName)
 
+	slog.Info("cf parse CSV start (this month)", "outputPath", fileNameCSV)
+	if err := moneyforward.ImportStart(ctx, fileNameCSV, page); err != nil {
+		slog.Error("failed to parse CSV", "outputPath", fileNameCSV)
+		return err
+	}
+	slog.Info("cf parse CSV complete (this month)", "outputPath", fileNameCSV)
+
+	// 先月のページに移動
+	err = func() error {
+		lastmonthButton, err := page.Timeout(10 * time.Second).Element(`[class="fc-button-content"]`)
+		if err != nil {
+			return err
+		}
+
+		if err := lastmonthButton.Click(proto.InputMouseButtonLeft, 1); err != nil {
+			slog.Error("failed to click lastmonth button")
+			return err
+		}
+
+		time.Sleep(10 * time.Second) // ページ遷移を待つ
+		return nil
+	}()
+
+	if err != nil {
+		return err
+	}
+
+	slog.Info("cf download start (last month)")
+	if err := s.pageDownload(ctx, fileNameLm, page); err != nil {
+		slog.Error("write html error")
+		return err
+	}
+	slog.Info("cf download complete (last month)", "outputPath", fileNameLm)
+
+	slog.Info("cf parse CSV start (last month)", "outputPath", fileNameLmCSV)
+	if err := moneyforward.ImportStart(ctx, fileNameLmCSV, page); err != nil {
+		slog.Error("failed to parse CSV", "outputPath", fileNameLmCSV)
+		return err
+	}
+	slog.Info("cf parse CSV complete (last month)", "outputPath", fileNameLmCSV)
+
+	slog.Info("all scenario complete")
 	return nil
 }

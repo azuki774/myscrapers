@@ -1,66 +1,31 @@
-package importer
+package moneyforward
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"myscrapers/internal/csv"
-	"os"
-	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/go-rod/rod"
-	"github.com/go-rod/rod/lib/launcher"
 )
 
-const cfFileName = "cf.csv"
-const defaultInputCfFile = "file:///data/cf.html" // This file is browser's local html file.
+const cfFieldSize = 10
 
-type ImporterCF struct {
-	common      ImporterCommon
-	browser     *rod.Browser
-	yyyymmdd    string
-	inputCfFile string
-}
-
-func NewImporterCF(ctx context.Context) (*ImporterCF, error) {
-	outputDir := os.Getenv("outputDir")
-	yyyymmdd := time.Now().Format("20060102")
-	inputCfFile := os.Getenv("inputCfFile")
-
-	if outputDir == "" {
-		outputDir = defaultOutputDir
+func validateCF(header []string, bodies [][]string) error {
+	if len(header) != cfFieldSize {
+		return fmt.Errorf("invalid field size: header")
 	}
-
-	if inputCfFile == "" {
-		inputCfFile = defaultInputCfFile
+	for i, b := range bodies {
+		if len(b) != cfFieldSize {
+			return fmt.Errorf("invalid field size: bodies #%d", i+1)
+		}
 	}
-
-	return &ImporterCF{
-		common:      ImporterCommon{ws: os.Getenv("wsAddr"), outputDir: outputDir},
-		yyyymmdd:    yyyymmdd,
-		inputCfFile: inputCfFile,
-	}, nil
-}
-
-func (i *ImporterCF) getBrowser(ctx context.Context) error {
-	l, err := launcher.NewManaged("ws://" + i.common.ws)
-	if err != nil {
-		return err
-	}
-	// You can also set any flag remotely before you launch the remote browser.
-	// Available flags: https://peter.sh/experiments/chromium-command-line-switches
-	l.Set("disable-gpu").Delete("disable-gpu")
-
-	// Launch with headful mode
-	l.Headless(true).XVFB("--server-num=5", "--server-args=-screen 0 1600x900x16")
-
-	i.browser = rod.New().Client(l.MustClient()).MustConnect()
 	return nil
 }
 
 // cfPage は /cf のページを rod で取得したもの
-func (i *ImporterCF) getHeader(ctx context.Context, cfPage *rod.Page) (header []string, err error) {
+func getHeader(ctx context.Context, cfPage *rod.Page) (header []string, err error) {
 	cfDetailTable, err := cfPage.Element(`[id=cf-detail-table]`)
 	if err != nil {
 		slog.Error("failed to get cf-detail-table")
@@ -87,7 +52,7 @@ func (i *ImporterCF) getHeader(ctx context.Context, cfPage *rod.Page) (header []
 }
 
 // cfPage は /cf のページを rod で取得したもの
-func (i *ImporterCF) getBody(ctx context.Context, cfPage *rod.Page) (bodies [][]string, err error) {
+func getBody(ctx context.Context, cfPage *rod.Page) (bodies [][]string, err error) {
 	cfDetailTable, err := cfPage.Element(`[id=cf-detail-table]`)
 	if err != nil {
 		slog.Error("failed to get cf-detail-table")
@@ -117,27 +82,18 @@ func (i *ImporterCF) getBody(ctx context.Context, cfPage *rod.Page) (bodies [][]
 	return bodies, nil
 }
 
-func (i *ImporterCF) Start(ctx context.Context) (err error) {
-	slog.Info("connect to browser")
-	if err := i.getBrowser(ctx); err != nil {
-		slog.Error("failed to get browser")
-		return err
-	}
-
-	slog.Info("load cf page", "inputCfFile", i.inputCfFile)
-	page := i.browser.MustPage(i.inputCfFile).MustWaitStable()
-
+func ImportStart(ctx context.Context, filePath string, page *rod.Page) (err error) {
 	var header []string
 	var bodies [][]string
 
-	header, err = i.getHeader(ctx, page)
+	header, err = getHeader(ctx, page)
 	if err != nil {
 		slog.Error("failed to get header")
 		return err
 	}
 	slog.Info("get CSV header")
 
-	bodies, err = i.getBody(ctx, page)
+	bodies, err = getBody(ctx, page)
 	if err != nil {
 		slog.Error("failed to get bodies")
 		return err
@@ -145,15 +101,15 @@ func (i *ImporterCF) Start(ctx context.Context) (err error) {
 	slog.Info("get CSV body")
 
 	// validation
-	if err := csv.ValidateCF(header, bodies); err != nil {
+	if err := validateCF(header, bodies); err != nil {
 		return err
 	}
 
 	// csv書き込み
-	if err := csv.WriteFile(filepath.Join(i.common.outputDir, cfFileName), header, bodies); err != nil {
+	if err := csv.WriteFile(filePath, header, bodies); err != nil {
 		slog.Error("failed to output csv")
 		return err
 	}
-	slog.Info("output csv complete")
+	slog.Info("output csv complete", "outputPath", filePath)
 	return nil
 }
