@@ -5,22 +5,29 @@ YYYYMMDD=`date '+%Y%m%d'`
 
 # BUCKET_URL # from env (ex: "https://s3.ap-northeast-1.wasabisys.com")
 # BUCKET_NAME # from env (ex: hoge-system-stg-bucket)
-# BUCKET_DIR # from env (ex: fetcher/sbi)
+# BUCKET_DIR # from env (ex: fetcher/moneyforward)
 # AWS_REGION # from env (ex: ap-northeast-1)
 # AWS_ACCESS_KEY_ID # from env
 # AWS_SECRET_ACCESS_KEY # from env
+# user="xxxxxxxxx" # moneyforward id  , from env
+# pass="yyyyyyyyy" # moneyforward pass, from env
 # wsAddr # from env (ex: localhost:7327)
 
 SCRAPERS_BIN="/usr/local/bin/myscrapers"
 AWS_BIN="/usr/local/bin/aws/dist/aws"
-DATA_DIR="/data"
+outputDir="/data/${YYYYMM}/${YYYYMMDD}"
 
-REMOTE_DIR="${BUCKET_DIR}/${YYYYMM}"
+REMOTE_DIR="${BUCKET_DIR}/${YYYYMM}/${YYYYMMDD}"
 
-function fetch () {
-    echo "fetcher start"
-    ${SCRAPERS_BIN} download sbi
-    echo "fetcher complete"
+function download () {
+    echo "job start"
+    mkdir -p ${outputDir}
+    echo "output to dir: ${outputDir}"
+    outputDir=${outputDir} \
+    user=${user} \
+    pass=${pass} \
+    ${SCRAPERS_BIN} download moneyforward --lastmonth
+    echo "job complete"
 }
 
 function create_s3_credentials () {
@@ -42,18 +49,13 @@ function create_s3_credentials () {
 
 function s3_upload () {
     echo "s3 upload start"
-    mkdir -p ${DATA_DIR}/${YYYYMM}
-    cp -f ${DATA_DIR}/*.csv ${DATA_DIR}/${YYYYMM}/ # ex. $DATA_DIR/YYYYMMDD_1.csv -> $DATA_DIR/$YYYYMM/YYYYMMDD_1.csv
-    rm ${DATA_DIR}/*.csv
-    ${AWS_BIN} s3 cp ${DATA_DIR}/${YYYYMM}/ "s3://${BUCKET_NAME}/${REMOTE_DIR}" --recursive --endpoint-url="${BUCKET_URL}"
+    ${AWS_BIN} s3 cp ${outputDir}/ "s3://${BUCKET_NAME}/${REMOTE_DIR}" --recursive --endpoint-url="${BUCKET_URL}"
     echo "s3 upload complete"
 }
 
-fetch
+download
 
-if [ -z $BUCKET_NAME ]; then
-    exit 0
+if [ -n $BUCKET_NAME ]; then
+    create_s3_credentials
+    s3_upload
 fi
-
-create_s3_credentials
-s3_upload

@@ -26,3 +26,7 @@ deployment/browser/
 deployment/*.jpg
 
 !.gitkeep
+
+compose.yml
+*-token.env
+tmp

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"myscrapers/internal/scenario"
-	"os"
 
 	"github.com/spf13/cobra"
 )
@@ -15,6 +14,7 @@ var downloadArgsOption downloadArgsOpt
 type downloadArgsOpt struct {
 	SiteName  string
 	OutputDir string
+	LastMonth bool
 }
 
 // downloadCmd represents the download command
@@ -46,6 +46,17 @@ func startDownload(opts downloadArgsOpt) (err error) {
 			slog.Error("failed to scrape", "err", err.Error())
 			return err
 		}
+		slog.Info("download sbi complete")
+	case "moneyforward":
+		mf, err := scenario.NewScenarioMoneyForward(downloadArgsOption.LastMonth)
+		if err != nil {
+			return err
+		}
+		if err = mf.Start(ctx); err != nil {
+			slog.Error("failed to scrape", "err", err.Error())
+			return err
+		}
+		slog.Info("download moneyforward complete")
 	case "test-github":
 		sc := scenario.NewTestGitHub()
 		return sc.Start(ctx)
@@ -56,7 +67,6 @@ func startDownload(opts downloadArgsOpt) (err error) {
 }
 
 func init() {
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{AddSource: true}))
-	slog.SetDefault(logger)
 	rootCmd.AddCommand(downloadCmd)
+	downloadCmd.Flags().BoolVarP(&downloadArgsOption.LastMonth, "lastmonth", "l", true, "fetch last month") // 先月分も読み込むかどうか（月末取りこぼしを防ぐため、基本は true）
 }

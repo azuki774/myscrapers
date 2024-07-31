@@ -203,6 +203,7 @@ func (s *ScenarioSBI) getPortfolio(ctx context.Context) error {
 }
 
 func (s *ScenarioSBI) Start(ctx context.Context) error {
+	slog.Info("connect to browser")
 	if err := s.getBrowser(ctx); err != nil {
 		return err
 	}
