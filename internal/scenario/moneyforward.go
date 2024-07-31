@@ -3,7 +3,7 @@ package scenario
 import (
 	"context"
 	"log/slog"
-	"myscrapers/internal/moneyforward"
+	moneyforward "myscrapers/internal/importer"
 	"os"
 	"path/filepath"
 	"time"
@@ -12,6 +12,7 @@ import (
 	"github.com/go-rod/rod/lib/input"
 	"github.com/go-rod/rod/lib/launcher"
 	"github.com/go-rod/rod/lib/proto"
+	"github.com/go-rod/rod/lib/utils"
 )
 
 const mfCfURL = "https://moneyforward.com/cf" // also for login page without account_selector
@@ -103,7 +104,6 @@ func (s *ScenarioMoneyForward) login(ctx context.Context) error {
 }
 
 func (s *ScenarioMoneyForward) pageDownload(ctx context.Context, fileName string, page *rod.Page) error {
-	slog.Info("cf download start (this month)")
 	if err := os.WriteFile(fileName, []byte(page.MustHTML()), 0644); err != nil {
 		return err
 	}
@@ -127,7 +127,7 @@ func (s *ScenarioMoneyForward) Start(ctx context.Context) (err error) {
 	}
 
 	slog.Info("get cf page start")
-	page := s.browser.Timeout(60 * time.Second).MustPage(mfCfURL).MustWaitStable()
+	page := s.browser.MustPage(mfCfURL).MustWaitStable()
 	slog.Info("get cf page complete")
 
 	slog.Info("cf download start (this month)")
@@ -145,25 +145,38 @@ func (s *ScenarioMoneyForward) Start(ctx context.Context) (err error) {
 	slog.Info("cf parse CSV complete (this month)", "outputPath", fileNameCSV)
 
 	// 先月のページに移動
-	err = func() error {
-		lastmonthButton, err := page.Timeout(10 * time.Second).Element(`[class="fc-button-content"]`)
-		if err != nil {
-			return err
-		}
-
-		if err := lastmonthButton.Click(proto.InputMouseButtonLeft, 1); err != nil {
-			slog.Error("failed to click lastmonth button")
-			return err
-		}
-
-		time.Sleep(10 * time.Second) // ページ遷移を待つ
-		return nil
-	}()
-
+	lastmonthButton, err := page.Element(`[class="fc-button-content"]`)
 	if err != nil {
 		return err
 	}
 
+	if err := lastmonthButton.Click(proto.InputMouseButtonLeft, 1); err != nil {
+		slog.Error("failed to click lastmonth button")
+		return err
+	}
+
+	time.Sleep(10 * time.Second) // ページ遷移を待つ
+	img, err := page.Screenshot(true, &proto.PageCaptureScreenshot{
+		Format: proto.PageCaptureScreenshotFormatPng,
+		Clip: &proto.PageViewport{
+			X:      0,
+			Y:      0,
+			Width:  1920,
+			Height: 1080,
+
+			Scale: 2,
+		},
+		FromSurface: true,
+	})
+	if err != nil {
+		return err
+	}
+	err = utils.OutputFile(filepath.Join(s.common.outputDir, "screenshot.jpg"), img)
+	if err != nil {
+		return err
+	}
+
+	page = s.browser.MustPage(mfCfURL).MustWaitStable()
 	slog.Info("cf download start (last month)")
 	if err := s.pageDownload(ctx, fileNameLm, page); err != nil {
 		slog.Error("write html error")
