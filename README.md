@@ -1,5 +1,7 @@
 # myscrapers
 
+#### go-rod製のものは使わなくしました
+
 ## myscrapers download sbi
 - SBIのポートフォリオを保存
 - https://site1.sbisec.co.jp/ETGate/ に自動的にログインして、ポートフォリオの表ごとに保存する。
