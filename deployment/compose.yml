@@ -3,7 +3,7 @@ services:
     image: myscrapers-sbi:latest
     container_name: myscrapers-sbi
     environment:
-      - wsAddr=http://example.com:4444/wd/hub # your value
+      - chromeAddr=http://example.com/4444/wd/hub # your value
       - TZ="JST-9"
     env_file:
       - sbi-token.env
