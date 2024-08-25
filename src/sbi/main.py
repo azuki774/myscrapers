@@ -21,7 +21,7 @@ lg.addHandler(h)
 
 SBI_USER = os.getenv("user")
 SBI_PASS = os.getenv("pass")
-SAVE_DIR = "/data/"
+SAVE_DIR = "/data"
 LOGIN_URL = "https://site1.sbisec.co.jp/ETGate/"
 PORT_URL = "https://site1.sbisec.co.jp/ETGate/?_ControlID=WPLETpfR001Control&_PageID=DefaultPID&_DataStoreID=DSWPLETpfR001Control&_ActionID=DefaultAID&getFlg=on"
 
@@ -89,6 +89,7 @@ def createCSV(table_data):
 # 作成した文字列データから空行などを消してCSVフォーマットを整える
 def reshapeCSV(rawoutputCSV):
     outputCSV = rawoutputCSV.replace(",\n", ",")
+    outputCSV = outputCSV.replace("\n\n", "\n")
     return outputCSV
 
 # 作成した文字列データ(CSV)を指定場所に書き込み
@@ -107,9 +108,8 @@ def get_file_path(index):
     today = datetime.date.today()  # 出力：datetime.date(2020, 3, 22)
     yyyymm = "{0:%Y%m}".format(today)  # 202003
     yyyymmdd = "{0:%Y%m%d}".format(today)  # 20200322
-    os.makedirs(SAVE_DIR + yyyymm, exist_ok=True)
 
-    filepath = SAVE_DIR + yyyymm + "/" + yyyymmdd + "_" + str(index) + ".csv"
+    filepath = SAVE_DIR + "/" + yyyymmdd + "_" + str(index) + ".csv"
     return filepath
 
 
