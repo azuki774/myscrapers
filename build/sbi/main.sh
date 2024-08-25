@@ -20,8 +20,6 @@ function fetch () {
     echo "fetcher start"
     python3 -u /src/main.py
     echo "fetcher complete"
-
-    cat /data/20240825_1.csv
 }
 
 function create_s3_credentials {

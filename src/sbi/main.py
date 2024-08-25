@@ -30,8 +30,8 @@ def main():
     try:
         driver = driver.get_remote_driver()
         run_scenario(driver=driver)
-    except:
-        lg.error("failed to run fetch program")
+    except Exception as e:
+        lg.error("failed to run fetch program", e, stack_info=True)
     finally:
         # ブラウザを閉じる
         driver.quit()
