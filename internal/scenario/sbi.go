@@ -205,7 +205,6 @@ func (s *ScenarioSBI) getPortfolio(ctx context.Context) error {
 func (s *ScenarioSBI) Start(ctx context.Context) error {
 	slog.Info("connect to browser")
 	if err := s.getBrowser(ctx); err != nil {
-		slog.Error("get browser error", "err", err.Error())
 		return err
 	}
 	defer s.browser.Close()

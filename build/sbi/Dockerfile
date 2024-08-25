@@ -1,5 +1,13 @@
-FROM python:3.9-bookworm
+FROM golang:1.21.0 as builder
 
+COPY . /app/
+WORKDIR /app
+
+# Go build
+RUN go mod download
+RUN make bin-linux-amd64
+
+FROM debian:bookworm-slim as runner
 # Required Packages
 RUN apt-get update && \
     apt-get install -y curl unzip && \
@@ -10,9 +18,7 @@ RUN apt-get update && \
 RUN curl -o /var/tmp/awscli.zip https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip && \
     unzip -d /usr/local/bin/ /var/tmp/awscli.zip
 
-COPY /src/sbi/requirements.txt /tmp/
-RUN pip install --upgrade pip && pip install -r /tmp/requirements.txt && mkdir -p /data
-COPY --chmod=755 build/sbi/main.sh /src/main.sh
-COPY src/sbi/ /src/
-
-ENTRYPOINT ["/src/main.sh"]
+RUN mkdir -p /usr/local/bin && mkdir -p /data/
+COPY --from=builder /app/build/bin/myscrapers /usr/local/bin/myscrapers
+COPY --chmod=755 build/sbi/main.sh /usr/local/bin/main.sh
+ENTRYPOINT ["/usr/local/bin/main.sh"]

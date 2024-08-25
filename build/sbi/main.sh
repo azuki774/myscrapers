@@ -9,6 +9,7 @@ YYYYMMDD=`date '+%Y%m%d'`
 # AWS_REGION # from env (ex: ap-northeast-1)
 # AWS_ACCESS_KEY_ID # from env
 # AWS_SECRET_ACCESS_KEY # from env
+# wsAddr # from env (ex: localhost:7327)
 
 SCRAPERS_BIN="/usr/local/bin/myscrapers"
 AWS_BIN="/usr/local/bin/aws/dist/aws"
@@ -18,11 +19,11 @@ REMOTE_DIR="${BUCKET_DIR}/${YYYYMM}"
 
 function fetch () {
     echo "fetcher start"
-    python3 -u /src/main.py
+    ${SCRAPERS_BIN} download sbi
     echo "fetcher complete"
 }
 
-function create_s3_credentials {
+function create_s3_credentials () {
     echo "s3 credentials create start"
     mkdir -p ~/.aws/
 
