@@ -9,9 +9,9 @@ services:
   #     - sbi-token.env
   #   volumes:
   #     - ./browser/:/data/
-  myscrapers-sbi-test:
+  myscrapers-mf-test:
     image: myscrapers-mf:latest
-    container_name: myscrapers-sbi
+    container_name: myscrapers-mf
     environment:
       - chromeAddr=http://example.com:4444/wd/hub # your value
       - TZ="JST-9"
