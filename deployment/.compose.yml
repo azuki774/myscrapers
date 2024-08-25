@@ -1,9 +1,9 @@
 services:
   myscrapers-sbi-test:
     image: myscrapers-sbi:latest
-    container_name: myscrapers-sbi
+    container_name: myscrapers-sbi-test
     environment:
-      - chromeAddr=http://example.com:4444/wd/hub # your value
+      - wsAddr=katarina.int.azuki.blue:7317 # your browser value
       - TZ="JST-9"
     env_file:
       - sbi-token.env
