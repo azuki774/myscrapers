@@ -25,6 +25,12 @@ function download () {
     echo "fetcher complete"
 }
 
+function convert () {
+    echo "convert CSV start"
+    python3 -u /src/convert_cf.py /data/${YYYYMM}/${YYYYMMDD}/cf.html
+    echo "convert CSV end"
+}
+
 function create_s3_credentials () {
     echo "s3 credentials create start"
     mkdir -p ~/.aws/
@@ -49,6 +55,7 @@ function s3_upload () {
 }
 
 download
+convert
 
 if [ -n $BUCKET_NAME ]; then
     create_s3_credentials
