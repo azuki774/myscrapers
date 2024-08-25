@@ -8,6 +8,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from bs4 import BeautifulSoup
 import logging
 import json
 from pythonjsonlogger import jsonlogger
@@ -162,8 +163,9 @@ def write_html(html, url):
     today = dt.date.today()  # 出力：datetime.date(2020, 3, 22)
     yyyymm = "{0:%Y%m}".format(today)  # 202003
     yyyymmdd = "{0:%Y%m%d}".format(today)  # 20200322
+    os.makedirs(SAVE_DIR, exist_ok=True)
     os.makedirs(SAVE_DIR + yyyymm, exist_ok=True)
-    os.makedirs(SAVE_DIR + yyyymmdd, exist_ok=True)
+    os.makedirs(SAVE_DIR + yyyymm + "/" + yyyymmdd, exist_ok=True)
     path_w = SAVE_DIR + "/" + yyyymm + "/" + yyyymmdd + "/" + os.path.basename(url) + ".html"
     with open(path_w, mode="w") as f:
         f.write(html.decode("utf-8"))

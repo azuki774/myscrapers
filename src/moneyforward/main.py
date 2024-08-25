@@ -12,6 +12,8 @@ import logging
 from pythonjsonlogger import jsonlogger
 
 ROOTPAGE_URL = "https://moneyforward.com"
+PORTFOLIO_URL = "https://moneyforward.com/bs/portfolio"
+CF_URL = "https://moneyforward.com/cf"
 
 lg = logging.getLogger(__name__)
 lg.setLevel(logging.DEBUG)
@@ -44,8 +46,6 @@ def run_scenario(driver):
         sys.exit(1)
     lg.info("login ok")
 
-    urls = os.getenv("urls").split(",")
-
     # Refresh Button
     money.move_page(driver, ROOTPAGE_URL)
 
@@ -65,17 +65,21 @@ def run_scenario(driver):
         lg.warn("refresh button error or not set: %s", e)
 
     # download HTML
-    for url in urls:
-        try:
-            html = money.get_from_url(driver, url)
-            money.write_html(html, url)
-            if (
-                url == "https://moneyforward.com/cf"
-            ):  # このページは先月分のデータも取っておく
-                html = money.get_from_url_cf_lastmonth(driver)
-                money.write_html(html, url + "_lastmonth")
-        except Exception as e:
-            lg.error("failed to get HTML: %s", e)
+    try:
+        html = money.get_from_url(driver, CF_URL)
+        time.sleep(10)
+        money.write_html(html, CF_URL)
+
+        html = money.get_from_url_cf_lastmonth(driver)
+        time.sleep(10)
+        money.write_html(html, CF_URL + "_lastmonth")
+
+        html = money.get_from_url(driver, PORTFOLIO_URL)
+        time.sleep(10)
+        money.write_html(html, PORTFOLIO_URL)
+
+    except Exception as e:
+        lg.error("failed to get HTML: %s", e)
 
 if __name__ == "__main__":
     main()
