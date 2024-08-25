@@ -11,7 +11,7 @@ RUN curl -o /var/tmp/awscli.zip https://awscli.amazonaws.com/awscli-exe-linux-x8
     unzip -d /usr/local/bin/ /var/tmp/awscli.zip
 
 COPY /src/sbi/requirements.txt /tmp/
-RUN pip install --upgrade pip && pip install -r /tmp/requirements.txt
+RUN pip install --upgrade pip && pip install -r /tmp/requirements.txt && mkdir -p /data
 COPY --chmod=755 build/sbi/main.sh /src/main.sh
 COPY src/sbi/ /src/
 
