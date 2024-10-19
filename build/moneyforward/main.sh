@@ -57,5 +57,5 @@ download
 
 if [ -n $BUCKET_NAME ]; then
     create_s3_credentials
-    s3_upload
+    # s3_upload
 fi
