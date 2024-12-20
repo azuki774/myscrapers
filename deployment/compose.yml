@@ -1,4 +1,5 @@
 services:
+<<<<<<< Updated upstream
   myscrapers-sbi-test:
     image: myscrapers-sbi:latest
     container_name: myscrapers-sbi
@@ -7,15 +8,25 @@ services:
       - TZ="JST-9"
     env_file:
       - sbi-token.env
-    volumes:
-      - ./browser/:/data/
+=======
+  # myscrapers-sbi-test:
+  #   image: myscrapers-sbi:latest
+  #   container_name: myscrapers-sbi
+  #   environment:
+  #     - chromeAddr=http://example.com:4444/wd/hub # your value
+  #     - TZ="JST-9"
+  #   env_file:
+  #     - sbi-token.env
+  #   volumes:
+  #     - ./browser/:/data/
   myscrapers-mf-test:
     image: myscrapers-mf:latest
     container_name: myscrapers-mf
     environment:
-      - chromeAddr=http://example.com:4444/wd/hub # your value
+      - chromeAddr=http://amber-fiora.int.azuki.blue:32320/wd/hub # your value
       - TZ="JST-9"
     env_file:
       - moneyforward-token.env
+>>>>>>> Stashed changes
     volumes:
       - ./browser/:/data/

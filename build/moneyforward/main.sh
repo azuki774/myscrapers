@@ -15,19 +15,13 @@ YYYYMMDD=`date '+%Y%m%d'`
 
 SCRAPERS_BIN="/usr/local/bin/myscrapers"
 AWS_BIN="/usr/local/bin/aws/dist/aws"
-outputDir="/data/${YYYYMM}/${YYYYMMDD}"
 
-REMOTE_DIR="${BUCKET_DIR}/${YYYYMM}/${YYYYMMDD}"
+REMOTE_DIR="${BUCKET_DIR}"
 
-function download () {
-    echo "job start"
-    mkdir -p ${outputDir}
-    echo "output to dir: ${outputDir}"
-    outputDir=${outputDir} \
-    user=${user} \
-    pass=${pass} \
-    ${SCRAPERS_BIN} download moneyforward --lastmonth
-    echo "job complete"
+function fetch () {
+    echo "fetcher start"
+    python3 -u /src/main.py
+    echo "fetcher complete"
 }
 
 function create_s3_credentials () {
@@ -49,13 +43,15 @@ function create_s3_credentials () {
 
 function s3_upload () {
     echo "s3 upload start"
-    ${AWS_BIN} s3 cp ${outputDir}/ "s3://${BUCKET_NAME}/${REMOTE_DIR}" --recursive --endpoint-url="${BUCKET_URL}"
+    ${AWS_BIN} s3 cp ${DATA_DIR}/*.csv "s3://${BUCKET_NAME}/${REMOTE_DIR}/" --recursive --endpoint-url="${BUCKET_URL}"
     echo "s3 upload complete"
 }
 
-download
+fetch
 
-if [ -n $BUCKET_NAME ]; then
-    create_s3_credentials
-    # s3_upload
+if [ -z $BUCKET_NAME ]; then
+    exit 0
 fi
+
+create_s3_credentials
+s3_upload
