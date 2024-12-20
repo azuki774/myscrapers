@@ -27,7 +27,7 @@ SAVE_DIR = "/data"
 def main():
     global driver
     try:
-        driver = driver.get_remote_driver()
+        driver = driver.get_driver()
         run_scenario(driver=driver)
     except Exception as e:
         lg.error("failed to run fetch program", e, stack_info=True)
@@ -38,8 +38,6 @@ def main():
 def run_scenario(driver):
     login()
     lg.info("login OK")
-    download_detailCSV("202410")
-
 
 def login():
     url = "https://moneyforward.com/cf"  # for login page without account_selector
