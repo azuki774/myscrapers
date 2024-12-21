@@ -23,24 +23,27 @@ lg.addHandler(h)
 SBI_USER = os.getenv("user")
 SBI_PASS = os.getenv("pass")
 SAVE_DIR = "/data"
+CF_PAGE='https://moneyforward.com/cf'
 
 def main():
     global driver
     try:
         driver = driver.get_driver()
-        run_scenario(driver=driver)
+        run_scenario()
     except Exception as e:
         lg.error("failed to run fetch program", e, stack_info=True)
     finally:
         # ブラウザを閉じる
         driver.quit()
 
-def run_scenario(driver):
+def run_scenario():
     login()
     lg.info("login OK")
+    row_csv_data = download_csv_from_page()
+    lg.info("download csv OK")
 
 def login():
-    url = "https://moneyforward.com/cf"  # for login page without account_selector
+    url = CF_PAGE  # for login page without account_selector
     driver.get(url)
     lg.info("move Login page")
 
@@ -82,6 +85,59 @@ def login():
     driver.get(url)
     html = driver.page_source.encode("utf-8")
     return html
+
+# 今開いているcfページ
+def download_csv_from_page(lastmonth):
+    # ページソース取得
+    url = CF_PAGE
+    driver.get(url)
+    lg.info("move cf page")
+    html = driver.page_source
+    soup = BeautifulSoup(html, "html.parser")
+    table = soup.find(id="cf-detail-table")
+    tr_list = table.find_all("tr")
+    fetch_data = []
+    for i, tr in enumerate(tr_list):
+        row_data = []
+        td_list = tr.find_all("td")
+        for j, td in enumerate(td_list):
+            row_data.append(td.get_text().strip())
+        if len(row_data) > 0:
+            # 空行以外を挿入
+            fetch_data.append(row_data)
+    return fetch_data
+
+def convert_csv_data(fetch_data, lastmonth):
+    """
+    download_csv_from_page() で取得したデータを、MoneyForward公式のCSV形式に変換する
+
+    差異は下記
+    - 計算対象は無条件で1にする
+    - ID 部分は取得不可なので、空文字にする
+    - 振替欄も正しく入らない（空文字）
+    - ただし、文字コードは UTF8 のままにする（公式はSJIS）
+
+    ['', '12/09(月)', '物販', '-110', 'モバイルSuica', '未分類', '未分類', '', '', '']
+    - > "1","2024/12/09","物販","-110","モバイルSuica",”未分類","未分類","","",""
+    """
+    pass
+
+def convert_date_field(date_text, now_date, lastmonth):
+    """
+    今年 .. 2024年とする
+    12/09(月) -> 2024/12/09 に変換
+    ただし、lastmonth = True （先月のデータ）の場合は、
+    12/09（＊）-> 2023/12/09 に変換する（2024/12/09でなく）
+    """
+    # now_date  # now_date.date.today() or datetime.date(2020, 3, 22)
+    year = now_date.year
+    month = now_date.month
+    day = now_date.day
+
+    text_month = date_text[0:2]
+    if (lastmonth == True) and (text_month == "12"):
+        return str(year - 1) +  "/" + date_text[0:5]
+    return str(year) + "/" + date_text[0:5]
 
 def download_detailCSV(yyyymm):
     filename = yyyymm + ".csv"

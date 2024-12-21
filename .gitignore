@@ -30,3 +30,4 @@ deployment/*.jpg
 compose.yml
 *-token.env
 tmp
+src/moneyforward/__pycache__/

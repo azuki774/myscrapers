@@ -21,16 +21,3 @@ debug:
 clean:
 	sudo rm -rf deployment/browser/*
 	touch deployment/browser/.gitkeep
-
-setup:
-	go mod download
-	go mod tidy
-	go install honnef.co/go/tools/cmd/staticcheck@latest
-
-lint:
-	(! gofmt -s -d . | grep '^')
-	go vet ./...
-	staticcheck ./...
-
-test:
-	go test -v ./...
