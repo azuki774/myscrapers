@@ -40,8 +40,20 @@ def main():
 def run_scenario():
     login()
     lg.info("login OK")
-    row_csv_data = download_csv_from_page()
-    lg.info("download csv OK")
+    # this month download
+    row_csv_data = download_csv_from_page(False)
+    lg.info("download record OK")
+
+    print(row_csv_data)
+    csv_text = []
+    for rc in row_csv_data:
+        # 1行ごとの文字列に変換
+        row_csv_text = convert_csv_data(rc, False, None)
+        csv_text.append(row_csv_text)
+    
+    lg.info("parse record OK")
+    write_csv(csv_text, "/data/cf.csv")
+    lg.info("write csv OK")
 
 def login():
     url = CF_PAGE  # for login page without account_selector
@@ -124,14 +136,14 @@ def convert_csv_data(fetch_data, lastmonth, now_date):
     res_text = '"{0}","{1}","{2}","{3}","{4}","{5}","{6}","{7}","{8}","{9}"'.format(
         1, # 固定値
         convert_date_field(fetch_data[1], lastmonth, now_date),
-        fetch_data[2],
-        fetch_data[3],
-        fetch_data[4],
-        fetch_data[5],
-        fetch_data[6],
-        fetch_data[7],
-        fetch_data[8],
-        fetch_data[9],
+        fetch_data[2].split('\n')[0], # 最初の改行以降は消す
+        fetch_data[3].split('\n')[0],
+        fetch_data[4].split('\n')[0],
+        fetch_data[5].split('\n')[0],
+        fetch_data[6].split('\n')[0],
+        fetch_data[7].split('\n')[0],
+        fetch_data[8].split('\n')[0],
+        fetch_data[9].split('\n')[0],
     )
     return res_text
 
@@ -154,6 +166,13 @@ def convert_date_field(date_text, lastmonth, now_date):
     if (lastmonth == True) and (text_month == "12"):
         return str(year - 1) +  "/" + date_text[0:5]
     return str(year) + "/" + date_text[0:5]
+
+def write_csv(csv_data, path_w):
+    with open(path_w, mode='w') as f:
+        # ヘッダ書き込み
+        f.write('"計算対象","日付","内容","金額（円）","保有金融機関","大項目","中項目","メモ","振替","ID"\n')
+        for d in csv_data:
+            f.write(d + '\n')
 
 def download_detailCSV(yyyymm):
     filename = yyyymm + ".csv"
