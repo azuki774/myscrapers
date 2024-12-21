@@ -29,4 +29,19 @@ def test_convert_date_field():
         },
     ]
     for i, t in enumerate(test_data):
-        assert main.convert_date_field(t["date_text"], t["now_date"], t["lastmonth"]) == t["want"]
+        assert main.convert_date_field(t["date_text"], t["lastmonth"], t["now_date"]) == t["want"]
+
+def test_convert_csv_data():
+    test_data = [
+        {
+            "input": ['', '12/09(月)', '物販', '-110', 'モバイルSuica', '未分類', '未分類', '', '', ''],
+            "lastmonth": False,
+            "now_date": datetime.date(2024, 1, 23),
+            "want": '"1","2024/12/09","物販","-110","モバイルSuica","未分類","未分類","","",""',
+        }
+    ]
+
+    for i, t in enumerate(test_data):
+        print(main.convert_csv_data(t["input"], t["lastmonth"], t["now_date"]).encode())
+        print(t["want"].encode())
+        assert main.convert_csv_data(t["input"], t["lastmonth"], t["now_date"]) == t["want"]
