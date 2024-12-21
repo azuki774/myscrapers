@@ -11,11 +11,9 @@ YYYYMMDD=`date '+%Y%m%d'`
 # AWS_SECRET_ACCESS_KEY # from env
 # user="xxxxxxxxx" # moneyforward id  , from env
 # pass="yyyyyyyyy" # moneyforward pass, from env
-# wsAddr # from env (ex: localhost:7327)
 
-SCRAPERS_BIN="/usr/local/bin/myscrapers"
 AWS_BIN="/usr/local/bin/aws/dist/aws"
-
+DATA_DIR="/data"
 REMOTE_DIR="${BUCKET_DIR}"
 
 function fetch () {
@@ -43,7 +41,7 @@ function create_s3_credentials () {
 
 function s3_upload () {
     echo "s3 upload start"
-    ${AWS_BIN} s3 cp ${DATA_DIR}/*.csv "s3://${BUCKET_NAME}/${REMOTE_DIR}/" --recursive --endpoint-url="${BUCKET_URL}"
+    ${AWS_BIN} s3 cp ${DATA_DIR}/ "s3://${BUCKET_NAME}/${REMOTE_DIR}/" --recursive --endpoint-url="${BUCKET_URL}"
     echo "s3 upload complete"
 }
 
