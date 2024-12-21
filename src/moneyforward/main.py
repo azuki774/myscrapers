@@ -3,6 +3,7 @@ import os
 import datetime
 import time
 import logging
+import datetime
 from pythonjsonlogger import jsonlogger
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -107,9 +108,9 @@ def download_csv_from_page(lastmonth):
             fetch_data.append(row_data)
     return fetch_data
 
-def convert_csv_data(fetch_data, lastmonth):
+def convert_csv_data(fetch_data, lastmonth, now_date):
     """
-    download_csv_from_page() で取得したデータを、MoneyForward公式のCSV形式に変換する
+    download_csv_from_page() で取得したデータの1行を、MoneyForward公式のCSV形式に変換する
 
     差異は下記
     - 計算対象は無条件で1にする
@@ -118,18 +119,33 @@ def convert_csv_data(fetch_data, lastmonth):
     - ただし、文字コードは UTF8 のままにする（公式はSJIS）
 
     ['', '12/09(月)', '物販', '-110', 'モバイルSuica', '未分類', '未分類', '', '', '']
-    - > "1","2024/12/09","物販","-110","モバイルSuica",”未分類","未分類","","",""
+    - > "1","2024/12/09","物販","-110","モバイルSuica","未分類","未分類","","",""
     """
-    pass
+    res_text = '"{0}","{1}","{2}","{3}","{4}","{5}","{6}","{7}","{8}","{9}"'.format(
+        1, # 固定値
+        convert_date_field(fetch_data[1], lastmonth, now_date),
+        fetch_data[2],
+        fetch_data[3],
+        fetch_data[4],
+        fetch_data[5],
+        fetch_data[6],
+        fetch_data[7],
+        fetch_data[8],
+        fetch_data[9],
+    )
+    return res_text
 
-def convert_date_field(date_text, now_date, lastmonth):
+def convert_date_field(date_text, lastmonth, now_date):
     """
     今年 .. 2024年とする
     12/09(月) -> 2024/12/09 に変換
     ただし、lastmonth = True （先月のデータ）の場合は、
     12/09（＊）-> 2023/12/09 に変換する（2024/12/09でなく）
     """
-    # now_date  # now_date.date.today() or datetime.date(2020, 3, 22)
+    if now_date == None:
+        # now_date に指定がなければ現在時刻
+        now_date = datetime.date.today()
+
     year = now_date.year
     month = now_date.month
     day = now_date.day
