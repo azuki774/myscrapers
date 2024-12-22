@@ -27,6 +27,7 @@ SAVE_DIR = "/data"
 CF_FILENAME="cf.csv"
 CF_FILENAME_LASTMONTH="cf_lastmonth.csv"
 CF_PAGE='https://moneyforward.com/cf'
+ACCOUNTS_PAGE="https://moneyforward.com/accounts"
 
 def main():
     global driver
@@ -42,6 +43,9 @@ def main():
 def run_scenario():
     login()
     lg.info("login OK")
+
+    update_accounts()
+
     # this month download
     row_csv_data = download_csv_from_page(False)
     lg.info("download record OK")
@@ -116,8 +120,23 @@ def login():
     html = driver.page_source.encode("utf-8")
     return html
 
-# 今開いているcfページ
+def update_accounts():
+    url = ACCOUNTS_PAGE  # for login page without account_selector
+    driver.get(url)
+    lg.info("move accounts page")
+
+    # 「金融機関からのデータ一括更新」ボタンを押す
+    update_btn = driver.find_element(
+        by=By.XPATH,
+        value="/html/body/div[1]/div[2]/div[1]/div/div/div/section/p[2]/a",
+    )
+    update_btn.click()
+    lg.info("press update button. wait 60sec")
+    time.sleep(60) # 取得待ち
+
+
 def download_csv_from_page(lastmonth):
+    # 今開いているcfページ
     # ページソース取得
     url = CF_PAGE
     driver.get(url)
