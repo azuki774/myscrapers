@@ -24,6 +24,8 @@ lg.addHandler(h)
 SBI_USER = os.getenv("user")
 SBI_PASS = os.getenv("pass")
 SAVE_DIR = "/data"
+CF_FILENAME="cf.csv"
+CF_FILENAME_LASTMONTH="cf_lastmonth.csv"
 CF_PAGE='https://moneyforward.com/cf'
 
 def main():
@@ -44,7 +46,6 @@ def run_scenario():
     row_csv_data = download_csv_from_page(False)
     lg.info("download record OK")
 
-    print(row_csv_data)
     csv_text = []
     for rc in row_csv_data:
         # 1行ごとの文字列に変換
@@ -52,7 +53,23 @@ def run_scenario():
         csv_text.append(row_csv_text)
     
     lg.info("parse record OK")
-    write_csv(csv_text, "/data/cf.csv")
+    write_csv(csv_text, SAVE_DIR + "/" + CF_FILENAME)
+    lg.info("write csv OK")
+
+    # lastmonth ページを表示
+    press_lastmonth_btn()
+    lg.info("lastmonth page move ok")
+    row_csv_data = download_csv_from_page(False)
+    lg.info("download record(lastmonth) OK")
+
+    csv_text = []
+    for rc in row_csv_data:
+        # 1行ごとの文字列に変換
+        row_csv_text = convert_csv_data(rc, False, None)
+        csv_text.append(row_csv_text)
+    
+    lg.info("parse record(lastmonth) OK")
+    write_csv(csv_text, SAVE_DIR + "/" + CF_FILENAME_LASTMONTH)
     lg.info("write csv OK")
 
 def login():
@@ -174,27 +191,14 @@ def write_csv(csv_data, path_w):
         for d in csv_data:
             f.write(d + '\n')
 
-def download_detailCSV(yyyymm):
-    filename = yyyymm + ".csv"
-    lg.info("download start")
-    driver.get('https://moneyforward.com/cf/csv?from=' + "2024" + '%2F' + "10" + '%2F01&month=' + "2024" + '&year=' + "10")
-    time.sleep(10)
-    html = driver.page_source.encode("utf-8")
-    print(html)
-
-    lg.info("download complete")
-    lg.info("output to " + filename)
-
-# ディレクトリ作成とファイル名取得する
-def get_file_path(index, lastmonth):
-    today = datetime.date.today()  # 出力：datetime.date(2020, 3, 22)
-    yyyymm = "{0:%Y%m}".format(today)  # 202003
-
-    if lastmonth == False:
-        # 今月
-        filepath = SAVE_DIR + "/" + yyyymm + ".csv"
-    return filepath
-
+def press_lastmonth_btn():
+    # 先月に移動する[<]ボタンを押す
+    lastmonth_btn = driver.find_element(
+        by=By.XPATH,
+        value="/html/body/div[1]/div[2]/div/div/section/div[2]/button[1]",
+    )
+    lastmonth_btn.click()
+    time.sleep(5) # 画面遷移待ち
 
 if __name__ == "__main__":
     main()
