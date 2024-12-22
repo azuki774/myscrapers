@@ -20,6 +20,10 @@ function fetch () {
     echo "fetcher start"
     python3 -u /src/main.py
     echo "fetcher complete"
+
+    # utf8 -> sjis
+    cp -p cf.csv cf.csv.bak && cat cf.csv.bak | iconv -f utf8 -t sjis > cf.csv && rm -f cf.csv.bak
+    cp -p cf_lastmonth.csv cf_lastmonth.csv.bak && cat cf_lastmonth.csv.bak | iconv -f utf8 -t sjis > cf_lastmonth.csv && rm -f cf_lastmonth.csv.bak
 }
 
 function create_s3_credentials () {
