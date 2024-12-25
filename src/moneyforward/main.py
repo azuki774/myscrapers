@@ -4,6 +4,8 @@ import datetime
 import time
 import logging
 import datetime
+import argparse
+import s3
 from pythonjsonlogger import jsonlogger
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -30,10 +32,19 @@ CF_PAGE='https://moneyforward.com/cf'
 ACCOUNTS_PAGE="https://moneyforward.com/accounts"
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--s3-upload", help="optional", action="store_true") # s3 upload機能の有効化フラグ
+    args = parser.parse_args()
     global driver
     try:
         driver = driver.get_driver()
         run_scenario()
+        if args.s3_upload:
+            # s3 upload 機能フラグが有効なとき
+            lg.info("s3 upload start")
+            s3.upload_file(SAVE_DIR + "/" + CF_FILENAME)
+            s3.upload_file(SAVE_DIR + "/" + CF_FILENAME_LASTMONTH)
+            lg.info("s3 upload complete")
     except Exception as e:
         lg.error("failed to run fetch program", e, stack_info=True)
     finally:
