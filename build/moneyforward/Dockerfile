@@ -26,14 +26,10 @@ RUN wget -O chrome.json https://googlechromelabs.github.io/chrome-for-testing/kn
     unzip chrome.zip && \
     rm chrome.zip chrome.json
 
-# AWS Setup
-RUN curl -o /var/tmp/awscli.zip https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip && \
-    unzip -d /usr/local/bin/ /var/tmp/awscli.zip
-
 # Install Python module
 COPY /src/moneyforward/requirements.txt /tmp/
 RUN pip install --upgrade pip && pip install -r /tmp/requirements.txt && mkdir -p /data
-COPY --chmod=755 build/moneyforward/main.sh /src/main.sh
 COPY src/moneyforward/ /src/
 
-ENTRYPOINT ["/src/main.sh"]
+CMD [ "--s3-upload" ]
+ENTRYPOINT ["python3", "-u", "/src/main.py"]

@@ -2,6 +2,8 @@ import driver
 import os
 import datetime
 import logging
+import argparse
+import s3
 from pythonjsonlogger import jsonlogger
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -26,10 +28,18 @@ LOGIN_URL = "https://site1.sbisec.co.jp/ETGate/"
 PORT_URL = "https://site1.sbisec.co.jp/ETGate/?_ControlID=WPLETpfR001Control&_PageID=DefaultPID&_DataStoreID=DSWPLETpfR001Control&_ActionID=DefaultAID&getFlg=on"
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--s3-upload", help="optional", action="store_true") # s3 upload機能の有効化フラグ
+    args = parser.parse_args()
     global driver
     try:
-        driver = driver.get_remote_driver()
-        run_scenario(driver=driver)
+        driver = driver.get_driver()
+        # run_scenario(driver=driver)
+        if args.s3_upload:
+        # s3 upload 機能フラグが有効なとき
+            lg.info("s3 upload start")
+            s3.upload_files(SAVE_DIR) # /data/ 配下のファイルをまとめてアップロード
+            lg.info("s3 upload complete")
     except Exception as e:
         lg.error("failed to run fetch program", e, stack_info=True)
     finally:
@@ -108,8 +118,8 @@ def get_file_path(index):
     today = datetime.date.today()  # 出力：datetime.date(2020, 3, 22)
     yyyymm = "{0:%Y%m}".format(today)  # 202003
     yyyymmdd = "{0:%Y%m%d}".format(today)  # 20200322
-
-    filepath = SAVE_DIR + "/" + yyyymmdd + "_" + str(index) + ".csv"
+    os.makedirs(SAVE_DIR + "/" + yyyymm, exist_ok=True)
+    filepath = SAVE_DIR + "/" + yyyymm + "/" + yyyymmdd + "_" + str(index) + ".csv"
     return filepath
 
 
