@@ -74,13 +74,13 @@ def run_scenario():
     # lastmonth ページを表示
     press_lastmonth_btn()
     lg.info("lastmonth page move ok")
-    row_csv_data = download_csv_from_page(False)
+    row_csv_data = download_csv_from_page(True)
     lg.info("download record(lastmonth) OK")
 
     csv_text = []
     for rc in row_csv_data:
         # 1行ごとの文字列に変換
-        row_csv_text = convert_csv_data(rc, False, None)
+        row_csv_text = convert_csv_data(rc, True, None)
         csv_text.append(row_csv_text)
     
     lg.info("parse record(lastmonth) OK")
