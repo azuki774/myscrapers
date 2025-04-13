@@ -4,7 +4,5 @@ services:
     container_name: myscrapers-mf
     environment:
       - TZ="JST-9"
-    env_file:
-      - moneyforward-token.env
-    volumes:
+    volumes: # /data/cookie.json
       - ./browser/:/data/
