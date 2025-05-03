@@ -3,7 +3,9 @@ import os
 import datetime
 import time
 import logging
-import datetime
+import json
+import csv
+import time
 import argparse
 import s3
 from pythonjsonlogger import jsonlogger
@@ -52,10 +54,20 @@ def main():
         driver.quit()
 
 def run_scenario():
-    login()
-    lg.info("login OK")
+    cookies = load_cookies_from_json('/data/cookie.json')
+    for cookie in cookies:
+        driver.add_cookie(cookie)
+    
+    lg.info("load cookie OK")
 
-    update_accounts()
+    url = CF_PAGE # 1回入れないとうまくページ遷移しないので入れる
+    driver.get(url)
+    lg.info("move cf page")
+
+    # update_accounts()
+
+    # 「今月」ボタンを押す
+    lg.info("press this month button")
 
     # this month download
     row_csv_data = download_csv_from_page(False)
@@ -86,6 +98,11 @@ def run_scenario():
     lg.info("parse record(lastmonth) OK")
     write_csv(csv_text, SAVE_DIR + "/" + CF_FILENAME_LASTMONTH)
     lg.info("write csv OK")
+
+    lg.info("converting UTF-8 -> SJIS")
+    utf8tosjis(SAVE_DIR + "/" + CF_FILENAME)
+    utf8tosjis(SAVE_DIR + "/" + CF_FILENAME_LASTMONTH)
+    lg.info("converting UTF-8 -> SJIS OK")
 
 def login():
     url = CF_PAGE  # for login page without account_selector
@@ -145,6 +162,63 @@ def update_accounts():
     lg.info("press update button. wait 60sec")
     time.sleep(60) # 取得待ち
 
+def load_cookies_from_json(filepath):
+    url = CF_PAGE  # for login page without account_selector
+    driver.get(url)
+    lg.info("move Login page") # Cookie を設定するには一度そのドメインにログインする必要がある
+    time.sleep(10)
+
+    # Loads cookies from a JSON file and formats them for Selenium.
+    cookies = []
+    try:
+        with open(filepath, 'r') as f:
+            raw_cookies = json.load(f)
+
+        for cookie in raw_cookies:
+            # Format for Selenium, mapping keys like 'expirationDate' to 'expiry'
+            selenium_cookie = {
+                'name': cookie.get('name'),
+                'value': cookie.get('value'),
+                'domain': cookie.get('domain'),
+                'path': cookie.get('path'),
+                'secure': cookie.get('secure', False),
+                'httpOnly': cookie.get('httpOnly', False),
+            }
+            # Add expiry if 'expirationDate' exists (should be Unix timestamp)
+            if 'expirationDate' in cookie:
+                try:
+                    # Convert to integer Unix timestamp (seconds)
+                    expiry_ts = int(cookie['expirationDate'])
+                    # Optionally skip expired cookies (add_cookie might handle this)
+                    # if expiry_ts < time.time():
+                    #     continue
+                    selenium_cookie['expiry'] = expiry_ts
+                except (ValueError, TypeError):
+                    pass # Ignore if conversion fails
+
+            # Add sameSite attribute if present and valid
+            if 'sameSite' in cookie and cookie['sameSite'] in ['Strict', 'Lax', 'None', 'no_restriction', 'lax', 'strict']:
+                 # Selenium expects 'Strict', 'Lax', or 'None'
+                 ss_val = cookie['sameSite'].capitalize()
+                 if ss_val == 'No_restriction': ss_val = 'None' # Map common value from extensions
+                 if ss_val in ['Strict', 'Lax', 'None']:
+                    selenium_cookie['sameSite'] = ss_val
+
+            # Check for required keys before adding
+            if selenium_cookie.get('name') and selenium_cookie.get('value') and selenium_cookie.get('domain'):
+                cookies.append(selenium_cookie)
+            else:
+                print(f"Warning: Skipping cookie with missing required keys: {cookie}")
+
+    except FileNotFoundError:
+        print(f"Error: Cookie file not found: {filepath}")
+    except json.JSONDecodeError:
+        print(f"Error: Invalid JSON format in file: {filepath}")
+    except Exception as e:
+        print(f"Error: An error occurred while loading the cookie file: {e}")
+
+    return cookies
+
 
 def download_csv_from_page(lastmonth):
     # 今開いているcfページ
@@ -173,7 +247,6 @@ def convert_csv_data(fetch_data, lastmonth, now_date):
 
     差異は下記
     - 計算対象は無条件で1にする
-    - ID 部分は取得不可なので、空文字にする
     - 振替欄も正しく入らない（空文字）
     - ただし、文字コードは UTF8 のままにする（公式はSJIS）
 
@@ -221,6 +294,15 @@ def write_csv(csv_data, path_w):
         for d in csv_data:
             f.write(d + '\n')
 
+def press_nowmonth_btn():
+    # /cf ページにある「今月」ボタンを押す
+    now_btn = driver.find_element(
+        by=By.XPATH,
+        value="/html/body/div[1]/div[2]/div/div/div/section/section/div[2]/div/div/div[1]/div/div[4]/span",
+    )
+    now_btn.click()
+    time.sleep(5) # 画面遷移待ち
+
 def press_lastmonth_btn():
     # 先月に移動する[<]ボタンを押す
     lastmonth_btn = driver.find_element(
@@ -229,6 +311,26 @@ def press_lastmonth_btn():
     )
     lastmonth_btn.click()
     time.sleep(5) # 画面遷移待ち
+
+def utf8tosjis(filename):
+    """
+    utf8 で書き出された CSV を SJIS に変換する
+    """
+    data = []
+    try:
+        with open(filename, 'r', encoding='utf-8', newline='') as infile:
+            reader = csv.reader(infile)
+            # 全ての行をリストに読み込む
+            data = list(reader)
+        with open(filename, 'w', encoding='shift_jis', newline='', errors='replace') as outfile:
+            writer = csv.writer(outfile)
+            # メモリに格納したデータを全て書き出す
+            writer.writerows(data)
+        lg.info("converted'{filename}' to Shift-JIS")
+    except FileNotFoundError:
+        lg.error("'{filename}' is not found")
+    except Exception as e:
+        lg.error("error occurred while converting '{filename}': {e}")
 
 if __name__ == "__main__":
     main()
