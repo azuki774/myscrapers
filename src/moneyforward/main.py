@@ -64,7 +64,7 @@ def run_scenario():
     driver.get(url)
     lg.info("move cf page")
 
-    # update_accounts()
+    update_accounts()
 
     # 「今月」ボタンを押す
     lg.info("press this month button")
@@ -326,11 +326,11 @@ def utf8tosjis(filename):
             writer = csv.writer(outfile)
             # メモリに格納したデータを全て書き出す
             writer.writerows(data)
-        lg.info("converted'{filename}' to Shift-JIS")
+        lg.info(f"converted'{filename}' to Shift-JIS")
     except FileNotFoundError:
-        lg.error("'{filename}' is not found")
+        lg.error(f"'{filename}' is not found")
     except Exception as e:
-        lg.error("error occurred while converting '{filename}': {e}")
+        lg.error(f"error occurred while converting '{filename}': {e}")
 
 if __name__ == "__main__":
     main()
