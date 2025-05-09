@@ -64,7 +64,7 @@ def run_scenario():
     driver.get(url)
     lg.info("move cf page")
 
-    # update_accounts()
+    update_accounts()
 
     # 「今月」ボタンを押す
     lg.info("press this month button")
