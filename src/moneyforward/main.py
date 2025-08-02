@@ -5,7 +5,6 @@ import time
 import logging
 import json
 import csv
-import time
 import argparse
 import s3
 from pythonjsonlogger import jsonlogger
@@ -33,9 +32,10 @@ CF_FILENAME_LASTMONTH="cf_lastmonth.csv"
 CF_PAGE='https://moneyforward.com/cf'
 ACCOUNTS_PAGE="https://moneyforward.com/accounts"
 
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--s3-upload", help="optional", action="store_true") # s3 upload機能の有効化フラグ
+    parser.add_argument("--s3-upload", help="optional", action="store_true")  # s3 upload機能の有効化フラグ
     args = parser.parse_args()
     global driver
     try:
@@ -57,10 +57,10 @@ def run_scenario():
     cookies = load_cookies_from_json('/data/cookie.json')
     for cookie in cookies:
         driver.add_cookie(cookie)
-    
+
     lg.info("load cookie OK")
 
-    url = CF_PAGE # 1回入れないとうまくページ遷移しないので入れる
+    url = CF_PAGE  # 1回入れないとうまくページ遷移しないので入れる
     driver.get(url)
     lg.info("move cf page")
 
@@ -78,7 +78,7 @@ def run_scenario():
         # 1行ごとの文字列に変換
         row_csv_text = convert_csv_data(rc, False, None)
         csv_text.append(row_csv_text)
-    
+
     lg.info("parse record OK")
     write_csv(csv_text, SAVE_DIR + "/" + CF_FILENAME)
     lg.info("write csv OK")
@@ -94,7 +94,7 @@ def run_scenario():
         # 1行ごとの文字列に変換
         row_csv_text = convert_csv_data(rc, True, None)
         csv_text.append(row_csv_text)
-    
+
     lg.info("parse record(lastmonth) OK")
     write_csv(csv_text, SAVE_DIR + "/" + CF_FILENAME_LASTMONTH)
     lg.info("write csv OK")
@@ -103,6 +103,7 @@ def run_scenario():
     utf8tosjis(SAVE_DIR + "/" + CF_FILENAME)
     utf8tosjis(SAVE_DIR + "/" + CF_FILENAME_LASTMONTH)
     lg.info("converting UTF-8 -> SJIS OK")
+
 
 def login():
     url = CF_PAGE  # for login page without account_selector
@@ -140,13 +141,14 @@ def login():
         login_button.click()
         lg.info("input login_button")
 
-    except Exception as e:
+    except Exception:
         lg.info("maybe already login. skipped.")
 
     url = "https://moneyforward.com/"
     driver.get(url)
     html = driver.page_source.encode("utf-8")
     return html
+
 
 def update_accounts():
     url = ACCOUNTS_PAGE  # for login page without account_selector
@@ -160,12 +162,13 @@ def update_accounts():
     )
     update_btn.click()
     lg.info("press update button. wait 60sec")
-    time.sleep(60) # 取得待ち
+    time.sleep(60)  # 取得待ち
+
 
 def load_cookies_from_json(filepath):
     url = CF_PAGE  # for login page without account_selector
     driver.get(url)
-    lg.info("move Login page") # Cookie を設定するには一度そのドメインにログインする必要がある
+    lg.info("move Login page")  # Cookie を設定するには一度そのドメインにログインする必要がある
     time.sleep(10)
 
     # Loads cookies from a JSON file and formats them for Selenium.
@@ -194,14 +197,14 @@ def load_cookies_from_json(filepath):
                     #     continue
                     selenium_cookie['expiry'] = expiry_ts
                 except (ValueError, TypeError):
-                    pass # Ignore if conversion fails
+                    pass  # Ignore if conversion fails
 
             # Add sameSite attribute if present and valid
             if 'sameSite' in cookie and cookie['sameSite'] in ['Strict', 'Lax', 'None', 'no_restriction', 'lax', 'strict']:
-                 # Selenium expects 'Strict', 'Lax', or 'None'
-                 ss_val = cookie['sameSite'].capitalize()
-                 if ss_val == 'No_restriction': ss_val = 'None' # Map common value from extensions
-                 if ss_val in ['Strict', 'Lax', 'None']:
+                # Selenium expects 'Strict', 'Lax', or 'None'
+                ss_val = cookie['sameSite'].capitalize()
+                if ss_val == 'No_restriction': ss_val = 'None' # Map common value from extensions
+                if ss_val in ['Strict', 'Lax', 'None']:
                     selenium_cookie['sameSite'] = ss_val
 
             # Check for required keys before adding
@@ -241,6 +244,7 @@ def download_csv_from_page(lastmonth):
             fetch_data.append(row_data)
     return fetch_data
 
+
 def convert_csv_data(fetch_data, lastmonth, now_date):
     """
     download_csv_from_page() で取得したデータの1行を、MoneyForward公式のCSV形式に変換する
@@ -254,9 +258,9 @@ def convert_csv_data(fetch_data, lastmonth, now_date):
     - > "1","2024/12/09","物販","-110","モバイルSuica","未分類","未分類","","",""
     """
     res_text = '"{0}","{1}","{2}","{3}","{4}","{5}","{6}","{7}","{8}","{9}"'.format(
-        1, # 固定値
+        1,  # 固定値
         convert_date_field(fetch_data[1], lastmonth, now_date),
-        fetch_data[2].split('\n')[0], # 最初の改行以降は消す
+        fetch_data[2].split('\n')[0],  # 最初の改行以降は消す
         fetch_data[3].split('\n')[0],
         fetch_data[4].split('\n')[0],
         fetch_data[5].split('\n')[0],
@@ -267,6 +271,7 @@ def convert_csv_data(fetch_data, lastmonth, now_date):
     )
     return res_text
 
+
 def convert_date_field(date_text, lastmonth, now_date):
     """
     今年 .. 2024年とする
@@ -274,7 +279,7 @@ def convert_date_field(date_text, lastmonth, now_date):
     ただし、lastmonth = True （先月のデータ）の場合は、
     12/09（＊）-> 2023/12/09 に変換する（2024/12/09でなく）
     """
-    if now_date == None:
+    if now_date is None:
         # now_date に指定がなければ現在時刻
         now_date = datetime.date.today()
 
@@ -283,9 +288,10 @@ def convert_date_field(date_text, lastmonth, now_date):
     day = now_date.day
 
     text_month = date_text[0:2]
-    if (lastmonth == True) and (text_month == "12"):
-        return str(year - 1) +  "/" + date_text[0:5]
+    if (lastmonth) and (text_month == "12"):
+        return str(year - 1) + "/" + date_text[0:5]
     return str(year) + "/" + date_text[0:5]
+
 
 def write_csv(csv_data, path_w):
     with open(path_w, mode='w') as f:
@@ -294,6 +300,7 @@ def write_csv(csv_data, path_w):
         for d in csv_data:
             f.write(d + '\n')
 
+
 def press_nowmonth_btn():
     # /cf ページにある「今月」ボタンを押す
     now_btn = driver.find_element(
@@ -301,7 +308,8 @@ def press_nowmonth_btn():
         value="/html/body/div[1]/div[2]/div/div/div/section/section/div[2]/div/div/div[1]/div/div[4]/span",
     )
     now_btn.click()
-    time.sleep(5) # 画面遷移待ち
+    time.sleep(5)  # 画面遷移待ち
+
 
 def press_lastmonth_btn():
     # 先月に移動する[<]ボタンを押す
@@ -310,7 +318,8 @@ def press_lastmonth_btn():
         value="/html/body/div[1]/div[2]/div/div/section/div[2]/button[1]",
     )
     lastmonth_btn.click()
-    time.sleep(5) # 画面遷移待ち
+    time.sleep(5)  # 画面遷移待ち
+
 
 def utf8tosjis(filename):
     """
@@ -331,6 +340,7 @@ def utf8tosjis(filename):
         lg.error(f"'{filename}' is not found")
     except Exception as e:
         lg.error(f"error occurred while converting '{filename}': {e}")
+
 
 if __name__ == "__main__":
     main()
