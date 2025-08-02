@@ -140,9 +140,8 @@ def run_scenario_update():
     lg.info("update accounts")
     update_accounts()
 
-    if SUICA_XPATH is not None:
-        lg.info("update accounts (suica)")
-        update_accounts_suica()
+    lg.info("update accounts (suica)")
+    update_accounts_suica()
 
 
 def login():
