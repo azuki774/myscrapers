@@ -7,6 +7,7 @@ import json
 import csv
 import argparse
 import s3
+import typer
 from pythonjsonlogger import jsonlogger
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -29,31 +30,46 @@ SBI_PASS = os.getenv("pass")
 SAVE_DIR = "/data"
 CF_FILENAME="cf.csv"
 CF_FILENAME_LASTMONTH="cf_lastmonth.csv"
+HOME_PAGE='https://moneyforward.com/'
 CF_PAGE='https://moneyforward.com/cf'
 ACCOUNTS_PAGE="https://moneyforward.com/accounts"
 
+app = typer.Typer()
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--s3-upload", help="optional", action="store_true")  # s3 upload機能の有効化フラグ
-    args = parser.parse_args()
+
+@app.command()
+def fetch(s3_upload: bool = typer.Option(False, "--s3-upload", help="optional")):
+    """
+    fetch financial data and upload to s3
+    """
     global driver
     try:
         driver = driver.get_driver()
-        run_scenario()
-        if args.s3_upload:
-            # s3 upload 機能フラグが有効なとき
-            lg.info("s3 upload start")
-            s3.upload_file(SAVE_DIR + "/" + CF_FILENAME)
-            s3.upload_file(SAVE_DIR + "/" + CF_FILENAME_LASTMONTH)
-            lg.info("s3 upload complete")
-    except Exception as e:
-        lg.error("failed to run fetch program", e, stack_info=True)
+        run_scenario(s3_upload)
+    except Exception:
+        lg.error("failed to run fetch program", exc_info=True)
     finally:
         # ブラウザを閉じる
         driver.quit()
 
-def run_scenario():
+
+@app.command()
+def update():
+    """
+    update account data
+    """
+    global driver
+    try:
+        driver = driver.get_driver()
+        run_scenario_update()
+    except Exception:
+        lg.error("failed to run update program", exc_info=True)
+    finally:
+        # ブラウザを閉じる
+        driver.quit()
+
+
+def run_scenario(s3_upload: bool):
     cookies = load_cookies_from_json('/data/cookie.json')
     for cookie in cookies:
         driver.add_cookie(cookie)
@@ -63,8 +79,6 @@ def run_scenario():
     url = CF_PAGE  # 1回入れないとうまくページ遷移しないので入れる
     driver.get(url)
     lg.info("move cf page")
-
-    update_accounts()
 
     # 「今月」ボタンを押す
     lg.info("press this month button")
@@ -103,6 +117,32 @@ def run_scenario():
     utf8tosjis(SAVE_DIR + "/" + CF_FILENAME)
     utf8tosjis(SAVE_DIR + "/" + CF_FILENAME_LASTMONTH)
     lg.info("converting UTF-8 -> SJIS OK")
+
+    if s3_upload:
+        # s3 upload 機能フラグが有効なとき
+        lg.info("s3 upload start")
+        s3.upload_file(SAVE_DIR + "/" + CF_FILENAME)
+        s3.upload_file(SAVE_DIR + "/" + CF_FILENAME_LASTMONTH)
+        lg.info("s3 upload complete")
+
+
+def run_scenario_update():
+    cookies = load_cookies_from_json('/data/cookie.json')
+    for cookie in cookies:
+        driver.add_cookie(cookie)
+
+    lg.info("load cookie OK")
+
+    url = CF_PAGE  # 1回入れないとうまくページ遷移しないので入れる
+    driver.get(url)
+    lg.info("move cf page")
+
+    lg.info("update accounts")
+    update_accounts()
+
+    if SUICA_XPATH is not None:
+        lg.info("update accounts (suica)")
+        update_accounts_suica()
 
 
 def login():
@@ -163,6 +203,44 @@ def update_accounts():
     update_btn.click()
     lg.info("press update button. wait 60sec")
     time.sleep(60)  # 取得待ち
+
+
+def update_accounts_suica():
+    # なぜか モバイルSuica だけ一括更新ボタンだとうまくいかないので、別で対応する
+    # XPathで直接指定するのではなく、手続き的に要素を探す
+    url = HOME_PAGE
+    driver.get(url)
+    lg.info("Navigated to home page for Suica update.")
+    time.sleep(10)
+
+    # Get all account list items
+    accounts = driver.find_elements(By.CSS_SELECTOR, "li.account.facilities-column")
+    lg.info(f"Found {len(accounts)} account list items.")
+
+    for account_element in accounts:
+        try:
+            # Check if this list item contains the "モバイルSuica" link
+            account_element.find_element(By.LINK_TEXT, "モバイルSuica")
+            
+            # If found, it means this is the correct account item.
+            lg.info("Found the 'モバイルSuica' account item.")
+            
+            # Now, find the '更新' link within this item and click it.
+            update_link = account_element.find_element(By.LINK_TEXT, "更新")
+            update_link.click()
+            
+            lg.info("Clicked the '更新' link for 'モバイルSuica'. Waiting for 60 seconds.")
+            time.sleep(60)
+            
+            # Successfully clicked, so we can exit the function.
+            return
+        except Exception:
+            # This exception means either "モバイルSuica" or "更新" was not found in this item.
+            # This is expected for other accounts, so we just continue to the next one.
+            continue
+            
+    # If the loop completes without finding the Suica account, log a warning.
+    lg.warning("Could not find the 'モバイルSuica' account or its '更新' link on the page.")
 
 
 def load_cookies_from_json(filepath):
@@ -343,4 +421,4 @@ def utf8tosjis(filename):
 
 
 if __name__ == "__main__":
-    main()
+    app()
