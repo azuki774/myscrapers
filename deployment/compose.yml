@@ -7,4 +7,4 @@ services:
     volumes:
       # /data/cookie.json
       - ./browser/:/data/
-    command: [ "update" ]
+    command: [ "fetch" ]
