@@ -31,3 +31,4 @@ compose.yml
 *-token.env
 tmp
 src/moneyforward/__pycache__/
+.venv

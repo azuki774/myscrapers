@@ -4,3 +4,4 @@ webdriver-manager==4.0.2
 python-json-logger>=2.0.7
 pytest==8.3.4
 boto3==1.35.87
+typer[all]==0.12.3
