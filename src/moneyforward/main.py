@@ -30,9 +30,11 @@ SBI_PASS = os.getenv("pass")
 SAVE_DIR = "/data"
 CF_FILENAME="cf.csv"
 CF_FILENAME_LASTMONTH="cf_lastmonth.csv"
+ASSET_HISTORY_FILENAME="asset_history.csv"
 HOME_PAGE='https://moneyforward.com/'
 CF_PAGE='https://moneyforward.com/cf'
 ACCOUNTS_PAGE="https://moneyforward.com/accounts"
+BS_HISTORY_PAGE='https://moneyforward.com/bs/history'
 
 app = typer.Typer()
 
@@ -113,9 +115,13 @@ def run_scenario(s3_upload: bool):
     write_csv(csv_text, SAVE_DIR + "/" + CF_FILENAME_LASTMONTH)
     lg.info("write csv OK")
 
+    # bs history を保存
+    download_csv_from_bshistory_page()
+
     lg.info("converting UTF-8 -> SJIS")
     utf8tosjis(SAVE_DIR + "/" + CF_FILENAME)
     utf8tosjis(SAVE_DIR + "/" + CF_FILENAME_LASTMONTH)
+    utf8tosjis(SAVE_DIR + "/" + ASSET_HISTORY_FILENAME)
     lg.info("converting UTF-8 -> SJIS OK")
 
     if s3_upload:
@@ -123,6 +129,7 @@ def run_scenario(s3_upload: bool):
         lg.info("s3 upload start")
         s3.upload_file(SAVE_DIR + "/" + CF_FILENAME)
         s3.upload_file(SAVE_DIR + "/" + CF_FILENAME_LASTMONTH)
+        s3.upload_file(SAVE_DIR + "/" + ASSET_HISTORY_FILENAME)
         lg.info("s3 upload complete")
 
 
@@ -220,24 +227,24 @@ def update_accounts_suica():
         try:
             # Check if this list item contains the "モバイルSuica" link
             account_element.find_element(By.LINK_TEXT, "モバイルSuica")
-            
+
             # If found, it means this is the correct account item.
             lg.info("Found the 'モバイルSuica' account item.")
-            
+
             # Now, find the '更新' link within this item and click it.
             update_link = account_element.find_element(By.LINK_TEXT, "更新")
             update_link.click()
-            
+
             lg.info("Clicked the '更新' link for 'モバイルSuica'. Waiting for 60 seconds.")
             time.sleep(60)
-            
+
             # Successfully clicked, so we can exit the function.
             return
         except Exception:
             # This exception means either "モバイルSuica" or "更新" was not found in this item.
             # This is expected for other accounts, so we just continue to the next one.
             continue
-            
+
     # If the loop completes without finding the Suica account, log a warning.
     lg.warning("Could not find the 'モバイルSuica' account or its '更新' link on the page.")
 
@@ -396,6 +403,86 @@ def press_lastmonth_btn():
     )
     lastmonth_btn.click()
     time.sleep(5)  # 画面遷移待ち
+
+
+# 資産推移ページの表をダウンロード
+def download_csv_from_bshistory_page():
+    # 資産推移ページに移動
+    driver.get(BS_HISTORY_PAGE)
+    lg.info("move to asset history page")
+    time.sleep(5)  # ページ読み込み待ち
+
+    # テーブルデータを取得
+    table_data = extract_asset_history_table()
+    lg.info("extract table data OK")
+
+    # CSVファイルに保存
+    write_asset_history_csv(table_data, SAVE_DIR + "/" + ASSET_HISTORY_FILENAME)
+    lg.info("write asset history csv OK")
+
+
+def extract_asset_history_table():
+    """
+    資産推移ページのテーブルデータを抽出する
+    """
+    html = driver.page_source
+    soup = BeautifulSoup(html, "html.parser")
+
+    # class="table table-bordered" のテーブルを取得
+    table = soup.find("table", class_="table table-bordered")
+    if not table:
+        lg.error("Asset history table not found")
+        return []
+
+    rows = []
+
+    # ヘッダー行を取得
+    thead = table.find("thead")
+    if thead:
+        header_row = thead.find("tr")
+        if header_row:
+            headers = []
+            for th in header_row.find_all("th"):
+                headers.append(th.get_text().strip())
+            rows.append(headers)
+
+    # データ行を取得
+    tbody = table.find("tbody")
+    if tbody:
+        for tr in tbody.find_all("tr"):
+            row_data = []
+            for cell in tr.find_all(["th", "td"]):
+                # 詳細ボタンのリンクは除外して、テキストのみ取得
+                if cell.find("a"):
+                    # aタグがある場合はそのテキストを取得
+                    link_text = cell.find("a").get_text().strip()
+                    if link_text == "詳細":
+                        row_data.append("詳細")
+                    else:
+                        row_data.append(cell.get_text().strip())
+                else:
+                    # 金額のフォーマットを調整（円マークを除去し、カンマを残す）
+                    text = cell.get_text().strip()
+                    if text.endswith("円"):
+                        text = text[:-1]  # "円"を除去
+                    row_data.append(text)
+            rows.append(row_data)
+
+    return rows
+
+
+def write_asset_history_csv(table_data, filepath):
+    """
+    テーブルデータをCSVファイルに書き込む
+    """
+    try:
+        with open(filepath, 'w', encoding='utf-8', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            for row in table_data:
+                writer.writerow(row)
+        lg.info(f"Asset history CSV written to {filepath}")
+    except Exception as e:
+        lg.error(f"Error writing CSV file: {e}")
 
 
 def utf8tosjis(filename):
