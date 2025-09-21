@@ -28,7 +28,7 @@ RUN wget -O chrome.json https://googlechromelabs.github.io/chrome-for-testing/kn
 
 # Install Python module
 COPY /src/moneyforward/requirements.txt /tmp/
-RUN pip install --upgrade pip && pip install uv && uv pip install --system -r /tmp/requirements.txt && mkdir -p /data
+RUN pip install --no-cache-dir uv && uv pip install --system -r /tmp/requirements.txt && mkdir -p /data
 COPY src/moneyforward/ /src/
 
 CMD [ "--s3-upload" ]
