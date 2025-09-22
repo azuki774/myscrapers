@@ -50,6 +50,7 @@ def fetch(s3_upload: bool = typer.Option(False, "--s3-upload", help="optional"))
         run_scenario(s3_upload)
     except Exception:
         lg.error("failed to run fetch program", exc_info=True)
+        raise typer.Exit(1)
     finally:
         # ブラウザを閉じる
         driver.quit()
@@ -66,6 +67,7 @@ def update():
         run_scenario_update()
     except Exception:
         lg.error("failed to run update program", exc_info=True)
+        raise typer.Exit(1)
     finally:
         # ブラウザを閉じる
         driver.quit()
@@ -298,11 +300,18 @@ def load_cookies_from_json(filepath):
                 print(f"Warning: Skipping cookie with missing required keys: {cookie}")
 
     except FileNotFoundError:
-        print(f"Error: Cookie file not found: {filepath}")
-    except json.JSONDecodeError:
-        print(f"Error: Invalid JSON format in file: {filepath}")
+        lg.error(f"Cookie file not found: {filepath}")
+        raise FileNotFoundError(f"Cookie file not found: {filepath}")
+    except json.JSONDecodeError as e:
+        lg.error(f"Invalid JSON format in file: {filepath}: {e}")
+        raise json.JSONDecodeError(f"Invalid JSON format in file: {filepath}", e.doc, e.pos)
     except Exception as e:
-        print(f"Error: An error occurred while loading the cookie file: {e}")
+        lg.error(f"An error occurred while loading the cookie file: {e}")
+        raise Exception(f"An error occurred while loading the cookie file: {e}")
+
+    if not cookies:
+        lg.error(f"No valid cookies found in file: {filepath}")
+        raise ValueError(f"No valid cookies found in file: {filepath}")
 
     return cookies
 
