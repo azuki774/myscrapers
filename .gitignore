@@ -32,3 +32,8 @@ compose.yml
 tmp
 src/moneyforward/__pycache__/
 .venv
+.direnv/
+.gopath/
+go/myscraper/.playwright/
+go/myscraper/tmp/
+go/myscraper/myscraper
