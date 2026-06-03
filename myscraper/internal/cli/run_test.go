@@ -2,22 +2,41 @@ package cli
 
 import (
 	"bytes"
+	"context"
 	"testing"
+
+	"github.com/azuki774/myscrapers/myscraper/internal/scrape"
 )
 
-func TestRunNoop(t *testing.T) {
+type fakeRunner struct {
+	result scrape.Result
+	err    error
+}
+
+func (f fakeRunner) Run(ctx context.Context, req scrape.Request) (scrape.Result, error) {
+	return f.result, f.err
+}
+
+func TestRunPrintsSavedPath(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 
-	exitCode := Run(stdout, stderr)
+	exitCode := Run(
+		[]string{"--url", "https://github.com", "--out", "tmp/github.html"},
+		stdout,
+		stderr,
+		fakeRunner{
+			result: scrape.Result{
+				Title:      "GitHub",
+				OutputPath: "tmp/github.html",
+			},
+		},
+	)
 
 	if exitCode != 0 {
-		t.Fatalf("exitCode = %d, want 0", exitCode)
+		t.Fatalf("exitCode = %d, want 0; stderr = %q", exitCode, stderr.String())
 	}
-	if stdout.Len() != 0 {
-		t.Fatalf("stdout = %q, want empty", stdout.String())
-	}
-	if stderr.Len() != 0 {
-		t.Fatalf("stderr = %q, want empty", stderr.String())
+	if stdout.String() != "saved tmp/github.html (GitHub)\n" {
+		t.Fatalf("stdout = %q", stdout.String())
 	}
 }
