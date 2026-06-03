@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build a standalone Go-based scraper bootstrap under `go/myscraper` with a `myscraper` binary, Playwright-backed page fetching, and a Nix development shell, while leaving the existing Python scrapers untouched.
+**Goal:** Build a standalone Go-based scraper bootstrap under `myscraper` with a `myscraper` binary, Playwright-backed page fetching, and a Nix development shell, while leaving the existing Python scrapers untouched.
 
-**Architecture:** Keep the new Go code isolated inside `go/myscraper` as its own module so the current Python layout can remain unchanged. Split the Go code into a thin CLI parser, a service layer that writes scrape output, and a Playwright-backed browser adapter behind an interface so unit tests do not need a real browser. Put Nix at the repository root so `nix develop` can provision Go, Node, and the Playwright browser install path for the whole checkout without forcing a rewrite of the current build setup.
+**Architecture:** Keep the new Go code isolated inside `myscraper` as its own module so the current Python layout can remain unchanged. Split the Go code into a thin CLI parser, a service layer that writes scrape output, and a Playwright-backed browser adapter behind an interface so unit tests do not need a real browser. Put Nix at the repository root so `nix develop` can provision Go, Node, and the Playwright browser install path for the whole checkout without forcing a rewrite of the current build setup.
 
 **Tech Stack:** Go 1.24, `github.com/playwright-community/playwright-go` v0.5200.1, Nix flakes, direnv, Go standard library, `net/http/httptest`
 
@@ -16,28 +16,28 @@
 - Create: `.envrc`
 - Modify: `.gitignore`
 - Modify: `README.md`
-- Create: `go/myscraper/go.mod`
-- Create: `go/myscraper/cmd/myscraper/main.go`
-- Create: `go/myscraper/internal/cli/fetch.go`
-- Create: `go/myscraper/internal/cli/fetch_test.go`
-- Create: `go/myscraper/internal/cli/run.go`
-- Create: `go/myscraper/internal/cli/run_test.go`
-- Create: `go/myscraper/internal/scrape/service.go`
-- Create: `go/myscraper/internal/scrape/service_test.go`
-- Create: `go/myscraper/internal/browser/playwright.go`
-- Create: `go/myscraper/e2e/fetch_smoke_test.go`
-- Create: `go/myscraper/scripts/install-playwright.sh`
-- Create: `go/myscraper/scripts/dev-shell-smoke.sh`
+- Create: `myscraper/go.mod`
+- Create: `myscraper/cmd/myscraper/main.go`
+- Create: `myscraper/internal/cli/fetch.go`
+- Create: `myscraper/internal/cli/fetch_test.go`
+- Create: `myscraper/internal/cli/run.go`
+- Create: `myscraper/internal/cli/run_test.go`
+- Create: `myscraper/internal/scrape/service.go`
+- Create: `myscraper/internal/scrape/service_test.go`
+- Create: `myscraper/internal/browser/playwright.go`
+- Create: `myscraper/e2e/fetch_smoke_test.go`
+- Create: `myscraper/scripts/install-playwright.sh`
+- Create: `myscraper/scripts/dev-shell-smoke.sh`
 
-`go/myscraper` is intentionally separate from the existing `src/` tree because `src/` is Python today. That keeps the Go module, Playwright cache, and future Go-only tests from colliding with the current Python import layout.
+`myscraper` is intentionally separate from the existing `src/` tree because `src/` is Python today. That keeps the Go module, Playwright cache, and future Go-only tests from colliding with the current Python import layout.
 
 ### Task 1: Bootstrap the Go Module and Fetch Flag Parsing
 
 **Files:**
-- Create: `go/myscraper/go.mod`
-- Create: `go/myscraper/cmd/myscraper/main.go`
-- Create: `go/myscraper/internal/cli/fetch.go`
-- Test: `go/myscraper/internal/cli/fetch_test.go`
+- Create: `myscraper/go.mod`
+- Create: `myscraper/cmd/myscraper/main.go`
+- Create: `myscraper/internal/cli/fetch.go`
+- Test: `myscraper/internal/cli/fetch_test.go`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -74,20 +74,20 @@ func TestParseArgs(t *testing.T) {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd go/myscraper && go test ./internal/cli -run TestParseArgs -v`
+Run: `cd myscraper && go test ./internal/cli -run TestParseArgs -v`
 Expected: FAIL with `undefined: ParseArgs`
 
 - [ ] **Step 3: Write minimal implementation**
 
-`go/myscraper/go.mod`
+`myscraper/go.mod`
 
 ```go
-module github.com/azuki774/myscrapers/go/myscraper
+module github.com/azuki774/myscrapers/myscraper
 
 go 1.24.0
 ```
 
-`go/myscraper/internal/cli/fetch.go`
+`myscraper/internal/cli/fetch.go`
 
 ```go
 package cli
@@ -123,7 +123,7 @@ func ParseArgs(args []string) (Options, error) {
 }
 ```
 
-`go/myscraper/cmd/myscraper/main.go`
+`myscraper/cmd/myscraper/main.go`
 
 ```go
 package main
@@ -132,7 +132,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/azuki774/myscrapers/go/myscraper/internal/cli"
+	"github.com/azuki774/myscrapers/myscraper/internal/cli"
 )
 
 func main() {
@@ -148,28 +148,28 @@ func main() {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd go/myscraper && go test ./internal/cli -run TestParseArgs -v`
+Run: `cd myscraper && go test ./internal/cli -run TestParseArgs -v`
 Expected: PASS
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add go/myscraper/go.mod go/myscraper/cmd/myscraper/main.go go/myscraper/internal/cli/fetch.go go/myscraper/internal/cli/fetch_test.go
+git add myscraper/go.mod myscraper/cmd/myscraper/main.go myscraper/internal/cli/fetch.go myscraper/internal/cli/fetch_test.go
 git commit -m "feat: scaffold myscraper Go module"
 ```
 
 ### Task 2: Add the Scrape Service and CLI Execution Flow
 
 **Files:**
-- Create: `go/myscraper/internal/cli/run.go`
-- Test: `go/myscraper/internal/cli/run_test.go`
-- Create: `go/myscraper/internal/scrape/service.go`
-- Test: `go/myscraper/internal/scrape/service_test.go`
-- Modify: `go/myscraper/cmd/myscraper/main.go`
+- Create: `myscraper/internal/cli/run.go`
+- Test: `myscraper/internal/cli/run_test.go`
+- Create: `myscraper/internal/scrape/service.go`
+- Test: `myscraper/internal/scrape/service_test.go`
+- Modify: `myscraper/cmd/myscraper/main.go`
 
 - [ ] **Step 1: Write the failing tests**
 
-`go/myscraper/internal/scrape/service_test.go`
+`myscraper/internal/scrape/service_test.go`
 
 ```go
 package scrape
@@ -224,7 +224,7 @@ func TestServiceRunWritesHTML(t *testing.T) {
 }
 ```
 
-`go/myscraper/internal/cli/run_test.go`
+`myscraper/internal/cli/run_test.go`
 
 ```go
 package cli
@@ -234,7 +234,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/azuki774/myscrapers/go/myscraper/internal/scrape"
+	"github.com/azuki774/myscrapers/myscraper/internal/scrape"
 )
 
 type fakeRunner struct {
@@ -273,12 +273,12 @@ func TestRunPrintsSavedPath(t *testing.T) {
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `cd go/myscraper && go test ./internal/... -run 'Test(ServiceRunWritesHTML|RunPrintsSavedPath)' -v`
+Run: `cd myscraper && go test ./internal/... -run 'Test(ServiceRunWritesHTML|RunPrintsSavedPath)' -v`
 Expected: FAIL with `undefined: Service` and `undefined: Run`
 
 - [ ] **Step 3: Write minimal implementation**
 
-`go/myscraper/internal/scrape/service.go`
+`myscraper/internal/scrape/service.go`
 
 ```go
 package scrape
@@ -339,7 +339,7 @@ func (s Service) Run(ctx context.Context, req Request) (Result, error) {
 }
 ```
 
-`go/myscraper/internal/cli/run.go`
+`myscraper/internal/cli/run.go`
 
 ```go
 package cli
@@ -349,7 +349,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/azuki774/myscrapers/go/myscraper/internal/scrape"
+	"github.com/azuki774/myscrapers/myscraper/internal/scrape"
 )
 
 type Runner interface {
@@ -378,7 +378,7 @@ func Run(args []string, stdout, stderr io.Writer, runner Runner) int {
 }
 ```
 
-`go/myscraper/cmd/myscraper/main.go`
+`myscraper/cmd/myscraper/main.go`
 
 ```go
 package main
@@ -388,8 +388,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/azuki774/myscrapers/go/myscraper/internal/cli"
-	"github.com/azuki774/myscrapers/go/myscraper/internal/scrape"
+	"github.com/azuki774/myscrapers/myscraper/internal/cli"
+	"github.com/azuki774/myscrapers/myscraper/internal/scrape"
 )
 
 type notReadyRunner struct{}
@@ -405,22 +405,22 @@ func main() {
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `cd go/myscraper && go test ./internal/... -run 'Test(ServiceRunWritesHTML|RunPrintsSavedPath)' -v`
+Run: `cd myscraper && go test ./internal/... -run 'Test(ServiceRunWritesHTML|RunPrintsSavedPath)' -v`
 Expected: PASS
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add go/myscraper/internal/cli/run.go go/myscraper/internal/cli/run_test.go go/myscraper/internal/scrape/service.go go/myscraper/internal/scrape/service_test.go go/myscraper/cmd/myscraper/main.go
+git add myscraper/internal/cli/run.go myscraper/internal/cli/run_test.go myscraper/internal/scrape/service.go myscraper/internal/scrape/service_test.go myscraper/cmd/myscraper/main.go
 git commit -m "feat: add myscraper service flow"
 ```
 
 ### Task 3: Wire the Real Playwright Browser Adapter
 
 **Files:**
-- Create: `go/myscraper/internal/browser/playwright.go`
-- Modify: `go/myscraper/cmd/myscraper/main.go`
-- Test: `go/myscraper/e2e/fetch_smoke_test.go`
+- Create: `myscraper/internal/browser/playwright.go`
+- Modify: `myscraper/cmd/myscraper/main.go`
+- Test: `myscraper/e2e/fetch_smoke_test.go`
 
 - [ ] **Step 1: Write the failing smoke test**
 
@@ -436,8 +436,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/azuki774/myscrapers/go/myscraper/internal/browser"
-	"github.com/azuki774/myscrapers/go/myscraper/internal/scrape"
+	"github.com/azuki774/myscrapers/myscraper/internal/browser"
+	"github.com/azuki774/myscrapers/myscraper/internal/scrape"
 )
 
 func TestFetchSmoke(t *testing.T) {
@@ -478,12 +478,12 @@ func TestFetchSmoke(t *testing.T) {
 
 - [ ] **Step 2: Run smoke test to verify it fails**
 
-Run: `cd go/myscraper && PLAYWRIGHT_E2E=1 go test ./e2e -run TestFetchSmoke -v`
+Run: `cd myscraper && PLAYWRIGHT_E2E=1 go test ./e2e -run TestFetchSmoke -v`
 Expected: FAIL with `cannot find package` / `undefined: browser.PlaywrightBrowser`
 
 - [ ] **Step 3: Write minimal implementation**
 
-`go/myscraper/internal/browser/playwright.go`
+`myscraper/internal/browser/playwright.go`
 
 ```go
 package browser
@@ -492,7 +492,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/azuki774/myscrapers/go/myscraper/internal/scrape"
+	"github.com/azuki774/myscrapers/myscraper/internal/scrape"
 	"github.com/playwright-community/playwright-go"
 )
 
@@ -540,7 +540,7 @@ func (PlaywrightBrowser) Fetch(ctx context.Context, url string, headless bool) (
 }
 ```
 
-`go/myscraper/cmd/myscraper/main.go`
+`myscraper/cmd/myscraper/main.go`
 
 ```go
 package main
@@ -548,9 +548,9 @@ package main
 import (
 	"os"
 
-	"github.com/azuki774/myscrapers/go/myscraper/internal/browser"
-	"github.com/azuki774/myscrapers/go/myscraper/internal/cli"
-	"github.com/azuki774/myscrapers/go/myscraper/internal/scrape"
+	"github.com/azuki774/myscrapers/myscraper/internal/browser"
+	"github.com/azuki774/myscrapers/myscraper/internal/cli"
+	"github.com/azuki774/myscrapers/myscraper/internal/scrape"
 )
 
 func main() {
@@ -565,16 +565,16 @@ func main() {
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `cd go/myscraper && go test ./internal/... -v`
+Run: `cd myscraper && go test ./internal/... -v`
 Expected: PASS
 
-Run: `cd go/myscraper && go run github.com/playwright-community/playwright-go/cmd/playwright@v0.5200.1 install chromium && PLAYWRIGHT_E2E=1 go test ./e2e -run TestFetchSmoke -v`
+Run: `cd myscraper && go run github.com/playwright-community/playwright-go/cmd/playwright@v0.5200.1 install chromium && PLAYWRIGHT_E2E=1 go test ./e2e -run TestFetchSmoke -v`
 Expected: PASS
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add go/myscraper/internal/browser/playwright.go go/myscraper/e2e/fetch_smoke_test.go go/myscraper/cmd/myscraper/main.go
+git add myscraper/internal/browser/playwright.go myscraper/e2e/fetch_smoke_test.go myscraper/cmd/myscraper/main.go
 git commit -m "feat: wire playwright browser adapter"
 ```
 
@@ -585,12 +585,12 @@ git commit -m "feat: wire playwright browser adapter"
 - Create: `.envrc`
 - Modify: `.gitignore`
 - Modify: `README.md`
-- Create: `go/myscraper/scripts/install-playwright.sh`
-- Create: `go/myscraper/scripts/dev-shell-smoke.sh`
+- Create: `myscraper/scripts/install-playwright.sh`
+- Create: `myscraper/scripts/dev-shell-smoke.sh`
 
 - [ ] **Step 1: Write the failing shell smoke check**
 
-`go/myscraper/scripts/dev-shell-smoke.sh`
+`myscraper/scripts/dev-shell-smoke.sh`
 
 ```bash
 #!/usr/bin/env bash
@@ -605,7 +605,7 @@ nix develop -c bash -lc '
 
 - [ ] **Step 2: Run smoke check to verify it fails**
 
-Run: `bash go/myscraper/scripts/dev-shell-smoke.sh`
+Run: `bash myscraper/scripts/dev-shell-smoke.sh`
 Expected: FAIL because `flake.nix` does not exist yet
 
 - [ ] **Step 3: Write minimal implementation**
@@ -642,8 +642,8 @@ Expected: FAIL because `flake.nix` does not exist yet
           shellHook = ''
             export GOPATH="$PWD/.gopath"
             export GOMODCACHE="$PWD/.gopath/pkg/mod"
-            export PLAYWRIGHT_BROWSERS_PATH="$PWD/go/myscraper/.playwright"
-            export PATH="$PWD/go/myscraper/bin:$PATH"
+            export PLAYWRIGHT_BROWSERS_PATH="$PWD/myscraper/.playwright"
+            export PATH="$PWD/myscraper/bin:$PATH"
           '';
         };
       });
@@ -661,11 +661,11 @@ use flake
 ```gitignore
 .direnv/
 .gopath/
-go/myscraper/.playwright/
-go/myscraper/tmp/
+myscraper/.playwright/
+myscraper/tmp/
 ```
 
-`go/myscraper/scripts/install-playwright.sh`
+`myscraper/scripts/install-playwright.sh`
 
 ```bash
 #!/usr/bin/env bash
@@ -688,14 +688,14 @@ go run "github.com/playwright-community/playwright-go/cmd/playwright@${PLAYWRIGH
 ````markdown
 ## myscraper (Go + Playwright)
 
-The Go scraper lives in `go/myscraper` and is separate from the existing Python scrapers.
+The Go scraper lives in `myscraper` and is separate from the existing Python scrapers.
 
 ### Development setup
 
 ```bash
 nix develop
 direnv allow
-cd go/myscraper
+cd myscraper
 go test ./internal/... -v
 ./scripts/install-playwright.sh
 PLAYWRIGHT_E2E=1 go test ./e2e -run TestFetchSmoke -v
@@ -705,16 +705,16 @@ go run ./cmd/myscraper --url https://example.com --out tmp/example.html
 
 - [ ] **Step 4: Run checks to verify they pass**
 
-Run: `bash go/myscraper/scripts/dev-shell-smoke.sh`
+Run: `bash myscraper/scripts/dev-shell-smoke.sh`
 Expected: PASS
 
-Run: `nix develop -c bash -lc 'cd go/myscraper && go test ./internal/... -v'`
+Run: `nix develop -c bash -lc 'cd myscraper && go test ./internal/... -v'`
 Expected: PASS
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add flake.nix .envrc .gitignore README.md go/myscraper/scripts/install-playwright.sh go/myscraper/scripts/dev-shell-smoke.sh
+git add flake.nix .envrc .gitignore README.md myscraper/scripts/install-playwright.sh myscraper/scripts/dev-shell-smoke.sh
 git commit -m "chore: add nix shell for myscraper"
 ```
 

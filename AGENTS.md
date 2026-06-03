@@ -18,4 +18,4 @@ Use this file as the default instruction set for AI agents working in this repo.
 ## Go Changes
 
 - If you modify Go code, run a self-test with a `go test` command before finishing the task.
-- For the current Go scaffold, run tests from `go/myscraper`, typically with `nix develop -c go test ./...`.
+- For the current Go scaffold, run tests from `myscraper`, typically with `nix develop -c go test ./...`.

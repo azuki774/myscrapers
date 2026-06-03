@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/azuki774/myscrapers/go/myscraper/internal/cli"
+	"github.com/azuki774/myscrapers/myscraper/internal/cli"
 )
 
 func main() {

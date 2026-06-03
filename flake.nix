@@ -24,7 +24,7 @@
           shellHook = ''
             export GOPATH="$PWD/.gopath"
             export GOMODCACHE="$PWD/.gopath/pkg/mod"
-            export PLAYWRIGHT_BROWSERS_PATH="$PWD/go/myscraper/.playwright"
+            export PLAYWRIGHT_BROWSERS_PATH="$PWD/myscraper/.playwright"
           '';
         };
       });

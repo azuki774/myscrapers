@@ -1,5 +1,10 @@
 # myscrapers
 
+## myscraper (Go)
+- 新しい Go ベースの scraper 実装は `myscraper/` 配下にある
+- 既存 Python scraper は `src/` 配下に残し、legacy 扱いで維持する
+- 開発時は `nix develop` の上で `cd myscraper && go test ./...` を使う
+
 ## myscrapers-sbi
 - SBIのポートフォリオを保存
 - https://site1.sbisec.co.jp/ETGate/ に自動的にログインして、ポートフォリオの表ごとに保存する。
