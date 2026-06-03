@@ -34,6 +34,9 @@ src/moneyforward/__pycache__/
 .venv
 .direnv/
 .gopath/
+myscraper/.playwright/
+myscraper/tmp/
+myscraper/myscraper
 go/myscraper/.playwright/
 go/myscraper/tmp/
 go/myscraper/myscraper
