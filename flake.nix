@@ -15,6 +15,7 @@
           packages = with pkgs; [
             bashInteractive
             coreutils
+            chromium
             direnv
             go
             gopls
