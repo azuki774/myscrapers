@@ -5,6 +5,15 @@
 - 既存 Python scraper は `src/` 配下に残し、legacy 扱いで維持する
 - 開発時は `nix develop` の上で `cd myscraper && go test ./...` を使う
 
+### myscraper CLI
+```bash
+nix develop
+cd myscraper
+go test ./internal/... -v
+PLAYWRIGHT_E2E=1 go test ./e2e -run TestGitHubSmoke -v
+go run ./cmd/myscraper --url https://github.com --out tmp/github.html
+```
+
 ## myscrapers-sbi
 - SBIのポートフォリオを保存
 - https://site1.sbisec.co.jp/ETGate/ に自動的にログインして、ポートフォリオの表ごとに保存する。

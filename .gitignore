@@ -37,6 +37,7 @@ src/moneyforward/__pycache__/
 .vscode/
 .playwright-driver/
 myscraper/.playwright/
+.playwright-driver/
 myscraper/bin/
 myscraper/tmp/
 myscraper/myscraper
