@@ -1,8 +1,11 @@
 // Package browser holds the Playwright-backed implementation of
-// scrape.Browser. It owns the Playwright driver download path,
-// the chromium executable lookup, and the per-request browser
-// lifecycle. The package is kept small so the scrape service can
-// stay free of Playwright-specific types.
+// scrape.Browser. It owns the Playwright driver download path, the
+// chromium executable lookup, and the per-request browser lifecycle.
+// The package is kept small so the scrape service and the per-flow
+// automation packages (e.g. internal/smbccard) can stay free of
+// Playwright-specific types. The package also adapts a Playwright
+// page to the smbccard.InteractivePage interface so the SMBC
+// workflow can be unit-tested without a real browser.
 package browser
 
 import (
@@ -12,13 +15,13 @@ import (
 	"os/exec"
 
 	"github.com/azuki774/myscrapers/myscraper/internal/scrape"
+	"github.com/azuki774/myscrapers/myscraper/internal/smbccard"
 	"github.com/playwright-community/playwright-go"
 )
 
 // PlaywrightBrowser is a zero-value, stateless adapter that satisfies
-// scrape.Browser. It is safe to construct at program start and
-// reuse across requests; per-request state is created by Playwright
-// itself.
+// scrape.Browser. It is safe to construct at program start and reuse
+// across requests; per-request state is created by Playwright itself.
 type PlaywrightBrowser struct{}
 
 // InstallDriver downloads (or refreshes) the Playwright Node driver
@@ -56,11 +59,18 @@ func chromiumExecutablePath() (string, error) {
 	return "", fmt.Errorf("no chromium-compatible browser found in PATH")
 }
 
-// Fetch opens url in a headless (or headed) Chromium driven by
-// Playwright and returns the rendered page snapshot. The browser
-// process is started on each call and torn down before returning so
-// callers do not need to manage Playwright's lifecycle directly.
-func (PlaywrightBrowser) Fetch(ctx context.Context, url string, headless bool) (scrape.PageSnapshot, error) {
+// withPage starts a Playwright-managed chromium browser, opens a new
+// page, and hands it to run. It installs the driver, launches the
+// browser, and tears everything down before returning so callers do
+// not need to manage Playwright's lifecycle directly.
+func withPage(
+	// ctx is part of the Browser interface contract and is reserved
+	// for future cancellation; the current implementation does not
+	// plumb it into the playwright driver.
+	ctx context.Context,
+	headless bool,
+	run func(page playwright.Page) (scrape.PageSnapshot, error),
+) (scrape.PageSnapshot, error) {
 	if err := InstallDriver(); err != nil {
 		return scrape.PageSnapshot{}, fmt.Errorf("install playwright driver: %w", err)
 	}
@@ -90,23 +100,93 @@ func (PlaywrightBrowser) Fetch(ctx context.Context, url string, headless bool) (
 		return scrape.PageSnapshot{}, fmt.Errorf("new page: %w", err)
 	}
 
-	if _, err := page.Goto(url); err != nil {
-		return scrape.PageSnapshot{}, fmt.Errorf("goto %s: %w", url, err)
-	}
+	return run(page)
+}
 
-	title, err := page.Title()
-	if err != nil {
-		return scrape.PageSnapshot{}, fmt.Errorf("read title: %w", err)
-	}
+// Fetch opens url in a headless (or headed) Chromium driven by
+// Playwright and returns the rendered page snapshot.
+func (PlaywrightBrowser) Fetch(ctx context.Context, url string, headless bool) (scrape.PageSnapshot, error) {
+	return withPage(ctx, headless, func(page playwright.Page) (scrape.PageSnapshot, error) {
+		if _, err := page.Goto(url); err != nil {
+			return scrape.PageSnapshot{}, fmt.Errorf("goto %s: %w", url, err)
+		}
+		title, err := page.Title()
+		if err != nil {
+			return scrape.PageSnapshot{}, fmt.Errorf("read title: %w", err)
+		}
+		html, err := page.Content()
+		if err != nil {
+			return scrape.PageSnapshot{}, fmt.Errorf("read content: %w", err)
+		}
+		return scrape.PageSnapshot{
+			URL:   page.URL(),
+			Title: title,
+			HTML:  html,
+		}, nil
+	})
+}
 
-	html, err := page.Content()
-	if err != nil {
-		return scrape.PageSnapshot{}, fmt.Errorf("read content: %w", err)
-	}
+// FetchSMBCCardWebMeisai runs the SMBC Card Vpass flow against the
+// given credentials and returns the rendered WEB明細 page snapshot.
+// The Playwright page is adapted to the smbccard.InteractivePage
+// interface so the workflow itself stays in the smbccard package and
+// can be exercised by unit tests with a fake page. The local
+// smbccard.PageSnapshot is converted to scrape.PageSnapshot at the
+// boundary to keep the smbccard package free of any scrape import.
+func (PlaywrightBrowser) FetchSMBCCardWebMeisai(ctx context.Context, creds smbccard.Credentials, headless bool) (scrape.PageSnapshot, error) {
+	return withPage(ctx, headless, func(page playwright.Page) (scrape.PageSnapshot, error) {
+		snapshot, err := smbccard.CaptureWebMeisai(playwrightInteractivePage{page: page}, creds)
+		if err != nil {
+			return scrape.PageSnapshot{}, err
+		}
+		return scrape.PageSnapshot{
+			URL:   snapshot.URL,
+			Title: snapshot.Title,
+			HTML:  snapshot.HTML,
+		}, nil
+	})
+}
 
-	return scrape.PageSnapshot{
-		URL:   url,
-		Title: title,
-		HTML:  html,
-	}, nil
+// playwrightInteractivePage adapts a Playwright page to the
+// smbccard.InteractivePage interface. It is unexported because the
+// only legitimate consumer is FetchSMBCCardWebMeisai in this same
+// package; callers outside the browser package should not need to
+// reach for Playwright types.
+type playwrightInteractivePage struct {
+	page playwright.Page
+}
+
+func (p playwrightInteractivePage) Goto(url string) error {
+	_, err := p.page.Goto(url, playwright.PageGotoOptions{
+		WaitUntil: playwright.WaitUntilStateNetworkidle,
+	})
+	return err
+}
+
+func (p playwrightInteractivePage) FillByLabel(label, value string) error {
+	// Per the InteractivePage contract, adapters must not include the
+	// value (which can be a credential) in any returned error.
+	return p.page.GetByLabel(label).Fill(value)
+}
+
+func (p playwrightInteractivePage) ClickButton(name string) error {
+	return p.page.GetByRole(*playwright.AriaRoleButton, playwright.PageGetByRoleOptions{
+		Name: name,
+	}).Click()
+}
+
+func (p playwrightInteractivePage) WaitForURL(pattern string) error {
+	return p.page.WaitForURL(pattern)
+}
+
+func (p playwrightInteractivePage) Title() (string, error) {
+	return p.page.Title()
+}
+
+func (p playwrightInteractivePage) Content() (string, error) {
+	return p.page.Content()
+}
+
+func (p playwrightInteractivePage) URL() string {
+	return p.page.URL()
 }

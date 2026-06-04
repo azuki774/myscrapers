@@ -1,10 +1,17 @@
 package smbccard
 
-import (
-	"fmt"
+import "fmt"
 
-	"github.com/azuki774/myscrapers/myscraper/internal/scrape"
-)
+// PageSnapshot is the result of running the WEB明細 workflow on a
+// page. It mirrors scrape.PageSnapshot but is defined locally so the
+// smbccard package does not import scrape (and create an import
+// cycle through the scrape service). The browser layer converts to
+// scrape.PageSnapshot at the API boundary.
+type PageSnapshot struct {
+	URL   string
+	Title string
+	HTML  string
+}
 
 // Top of the SMBC Card public site. The login flow expects some
 // session state from this page, so the workflow visits it before
@@ -41,42 +48,42 @@ type InteractivePage interface {
 // page and wait for it to settle. It returns the rendered page
 // snapshot of the WEB明細 page; the caller is responsible for
 // persisting it.
-func CaptureWebMeisai(page InteractivePage, creds Credentials) (scrape.PageSnapshot, error) {
+func CaptureWebMeisai(page InteractivePage, creds Credentials) (PageSnapshot, error) {
 	if err := page.Goto(TopURL); err != nil {
-		return scrape.PageSnapshot{}, fmt.Errorf("goto top page: %w", err)
+		return PageSnapshot{}, fmt.Errorf("goto top page: %w", err)
 	}
 	if err := page.Goto(LoginURL); err != nil {
-		return scrape.PageSnapshot{}, fmt.Errorf("goto login page: %w", err)
+		return PageSnapshot{}, fmt.Errorf("goto login page: %w", err)
 	}
 	if err := page.FillByLabel("VpassID", creds.LoginID); err != nil {
-		return scrape.PageSnapshot{}, fmt.Errorf("fill VpassID: %w", err)
+		return PageSnapshot{}, fmt.Errorf("fill VpassID: %w", err)
 	}
 	if err := page.FillByLabel("パスワード", creds.Password); err != nil {
-		return scrape.PageSnapshot{}, fmt.Errorf("fill password: %w", err)
+		return PageSnapshot{}, fmt.Errorf("fill password: %w", err)
 	}
 	if err := page.ClickButton("ログイン"); err != nil {
-		return scrape.PageSnapshot{}, fmt.Errorf("click login: %w", err)
+		return PageSnapshot{}, fmt.Errorf("click login: %w", err)
 	}
 	if err := page.WaitForURL(MyPageURLPattern); err != nil {
-		return scrape.PageSnapshot{}, fmt.Errorf("wait for mypage: %w", err)
+		return PageSnapshot{}, fmt.Errorf("wait for mypage: %w", err)
 	}
 	if err := page.Goto(WebMeisaiURL); err != nil {
-		return scrape.PageSnapshot{}, fmt.Errorf("goto web meisai page: %w", err)
+		return PageSnapshot{}, fmt.Errorf("goto web meisai page: %w", err)
 	}
 	if err := page.WaitForURL(WebMeisaiURLPattern); err != nil {
-		return scrape.PageSnapshot{}, fmt.Errorf("wait for web meisai page: %w", err)
+		return PageSnapshot{}, fmt.Errorf("wait for web meisai page: %w", err)
 	}
 
 	title, err := page.Title()
 	if err != nil {
-		return scrape.PageSnapshot{}, fmt.Errorf("read title: %w", err)
+		return PageSnapshot{}, fmt.Errorf("read title: %w", err)
 	}
 	html, err := page.Content()
 	if err != nil {
-		return scrape.PageSnapshot{}, fmt.Errorf("read content: %w", err)
+		return PageSnapshot{}, fmt.Errorf("read content: %w", err)
 	}
 
-	return scrape.PageSnapshot{
+	return PageSnapshot{
 		URL:   page.URL(),
 		Title: title,
 		HTML:  html,

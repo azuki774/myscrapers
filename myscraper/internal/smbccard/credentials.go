@@ -8,6 +8,7 @@ package smbccard
 
 import (
 	"errors"
+	"fmt"
 	"os"
 )
 
@@ -20,6 +21,14 @@ const ModeWebMeisaiHTMLDump = "smbc-card-webmeisai"
 type Credentials struct {
 	LoginID  string
 	Password string
+}
+
+// String returns a redacted representation suitable for logs and
+// error messages. The password is masked so a struct value that
+// escapes via %v, %s, fmt.Println, or a panic dump cannot leak
+// the secret.
+func (c Credentials) String() string {
+	return fmt.Sprintf("Credentials{LoginID:%q Password:****}", c.LoginID)
 }
 
 // LoadCredentialsFromEnv returns the Vpass credentials, preferring

@@ -2,6 +2,7 @@ package smbccard
 
 import (
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -59,5 +60,16 @@ func TestEnvOrFallback(t *testing.T) {
 
 	if _, ok := os.LookupEnv("PRIMARY"); !ok {
 		t.Fatalf("PRIMARY should still exist in environment during the test")
+	}
+}
+
+func TestCredentialsStringMasksPassword(t *testing.T) {
+	c := Credentials{LoginID: "member-id", Password: "super-secret"}
+	got := c.String()
+	if !strings.Contains(got, "member-id") {
+		t.Fatalf("String() = %q, want to contain LoginID", got)
+	}
+	if strings.Contains(got, "super-secret") {
+		t.Fatalf("String() = %q, must not contain password", got)
 	}
 }

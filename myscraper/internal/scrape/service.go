@@ -2,7 +2,10 @@
 // payloads, and a Service that drives a Browser and writes its HTML
 // snapshot to disk. The CLI layer talks to Service through these
 // types so the concrete browser implementation (Playwright or a test
-// fake) can be swapped without changing the CLI.
+// fake) can be swapped without changing the CLI. Service dispatches
+// on the Request.Mode field so additional scrape flows (e.g. the
+// authenticated SMBC Card flow) can be added without changing the
+// CLI layer.
 package scrape
 
 import (
@@ -10,13 +13,18 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/azuki774/myscrapers/myscraper/internal/smbccard"
 )
 
-// Browser is the minimum capability the scrape service needs: open a
-// URL with a real browser engine and return the rendered snapshot.
-// Implementations live in package browser; tests use a fake.
+// Browser is the minimum capability the scrape service needs:
+// either open a URL with a real browser engine and return the
+// rendered snapshot, or run the authenticated SMBC Card WEB明細 flow
+// with the supplied credentials. Implementations live in package
+// browser; tests use a fake that implements both methods.
 type Browser interface {
 	Fetch(ctx context.Context, url string, headless bool) (PageSnapshot, error)
+	FetchSMBCCardWebMeisai(ctx context.Context, creds smbccard.Credentials, headless bool) (PageSnapshot, error)
 }
 
 // PageSnapshot is the result of fetching a single page: where the
@@ -28,10 +36,11 @@ type PageSnapshot struct {
 	HTML  string
 }
 
-// Request is the input to Service.Run: the URL to fetch, the file the
-// HTML should be written to, and whether the browser should run
-// without a visible window.
+// Request is the input to Service.Run: the Mode selects which
+// Browser method to invoke; the remaining fields are interpreted
+// per-mode (URL for fetch-url, OutputPath and Headless for both).
 type Request struct {
+	Mode       string
 	URL        string
 	OutputPath string
 	Headless   bool
@@ -48,22 +57,40 @@ type Result struct {
 // browser work to a Browser, ensure the output directory exists,
 // and write the HTML snapshot to disk. It is intentionally a
 // dependency-injection-friendly value type so the CLI can hand it
-// any Browser implementation.
+// any Browser implementation. Mode dispatch keeps the per-flow
+// orchestration (e.g. SMBC credential loading) out of the CLI layer.
 type Service struct {
 	Browser Browser
 }
 
 // Run executes a Request. It returns an error if no Browser has been
-// configured, the Browser fails, or the output cannot be written.
-// The output file is created with mode 0644; callers that handle
-// sensitive HTML (e.g. authenticated financial statements) should
-// not reuse this path and must tighten permissions themselves.
+// configured, the Browser fails, the requested Mode is unknown, or
+// the output cannot be written. The output file is created with mode
+// 0644; callers that handle sensitive HTML (e.g. authenticated
+// financial statements) should not reuse this path and must tighten
+// permissions themselves.
 func (s Service) Run(ctx context.Context, req Request) (Result, error) {
 	if s.Browser == nil {
 		return Result{}, fmt.Errorf("browser is required")
 	}
 
-	snapshot, err := s.Browser.Fetch(ctx, req.URL, req.Headless)
+	var (
+		snapshot PageSnapshot
+		err      error
+	)
+
+	switch req.Mode {
+	case "", "fetch-url":
+		snapshot, err = s.Browser.Fetch(ctx, req.URL, req.Headless)
+	case smbccard.ModeWebMeisaiHTMLDump:
+		creds, loadErr := smbccard.LoadCredentialsFromEnv()
+		if loadErr != nil {
+			return Result{}, loadErr
+		}
+		snapshot, err = s.Browser.FetchSMBCCardWebMeisai(ctx, creds, req.Headless)
+	default:
+		return Result{}, fmt.Errorf("unsupported scrape mode: %s", req.Mode)
+	}
 	if err != nil {
 		return Result{}, err
 	}
