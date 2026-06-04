@@ -2,6 +2,9 @@ package cli
 
 import "testing"
 
+// TestParseArgs verifies that ParseArgs rejects an invocation with
+// no --url and applies the documented defaults (OutputPath and
+// Headless) when --url is provided.
 func TestParseArgs(t *testing.T) {
 	t.Run("requires url", func(t *testing.T) {
 		_, err := ParseArgs([]string{"--out", "tmp/page.html"})

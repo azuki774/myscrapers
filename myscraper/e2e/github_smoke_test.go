@@ -11,6 +11,11 @@ import (
 	"github.com/azuki774/myscrapers/myscraper/internal/scrape"
 )
 
+// TestGitHubSmoke is an end-to-end check that the Playwright-backed
+// fetch path can load a real public page (https://github.com),
+// produce a non-empty title containing "GitHub", and write an HTML
+// snapshot that contains the expected <html> marker. The test is
+// gated on PLAYWRIGHT_E2E=1 so unit-only runs stay network-free.
 func TestGitHubSmoke(t *testing.T) {
 	if os.Getenv("PLAYWRIGHT_E2E") != "1" {
 		t.Skip("set PLAYWRIGHT_E2E=1 to run browser smoke test")

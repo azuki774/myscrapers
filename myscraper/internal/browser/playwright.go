@@ -1,3 +1,8 @@
+// Package browser holds the Playwright-backed implementation of
+// scrape.Browser. It owns the Playwright driver download path,
+// the chromium executable lookup, and the per-request browser
+// lifecycle. The package is kept small so the scrape service can
+// stay free of Playwright-specific types.
 package browser
 
 import (
@@ -10,12 +15,23 @@ import (
 	"github.com/playwright-community/playwright-go"
 )
 
+// PlaywrightBrowser is a zero-value, stateless adapter that satisfies
+// scrape.Browser. It is safe to construct at program start and
+// reuse across requests; per-request state is created by Playwright
+// itself.
 type PlaywrightBrowser struct{}
 
+// InstallDriver downloads (or refreshes) the Playwright Node driver
+// into the directory resolved by runOptions. It is safe to call on
+// every Fetch because the underlying installer is idempotent.
 func InstallDriver() error {
 	return playwright.Install(runOptions())
 }
 
+// runOptions centralizes the Playwright driver configuration: the
+// driver lives under PLAYWRIGHT_DRIVER_PATH when set, otherwise under
+// the repo-local .playwright-driver directory; browser binaries are
+// not managed here because the dev shell supplies chromium directly.
 func runOptions() *playwright.RunOptions {
 	driverDirectory := os.Getenv("PLAYWRIGHT_DRIVER_PATH")
 	if driverDirectory == "" {
@@ -27,6 +43,10 @@ func runOptions() *playwright.RunOptions {
 	}
 }
 
+// chromiumExecutablePath resolves the chromium binary that Playwright
+// should drive. The dev shell puts a system chromium on PATH, so we
+// look it up by name rather than bundling a browser. Order matches
+// the most common package names on Debian, Nix, and macOS.
 func chromiumExecutablePath() (string, error) {
 	for _, candidate := range []string{"chromium", "chromium-browser", "google-chrome", "google-chrome-stable"} {
 		if path, err := exec.LookPath(candidate); err == nil {
@@ -36,6 +56,10 @@ func chromiumExecutablePath() (string, error) {
 	return "", fmt.Errorf("no chromium-compatible browser found in PATH")
 }
 
+// Fetch opens url in a headless (or headed) Chromium driven by
+// Playwright and returns the rendered page snapshot. The browser
+// process is started on each call and torn down before returning so
+// callers do not need to manage Playwright's lifecycle directly.
 func (PlaywrightBrowser) Fetch(ctx context.Context, url string, headless bool) (scrape.PageSnapshot, error) {
 	if err := InstallDriver(); err != nil {
 		return scrape.PageSnapshot{}, fmt.Errorf("install playwright driver: %w", err)

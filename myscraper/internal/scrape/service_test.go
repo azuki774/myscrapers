@@ -16,6 +16,9 @@ func (f fakeBrowser) Fetch(ctx context.Context, url string, headless bool) (Page
 	return f.snapshot, f.err
 }
 
+// TestServiceRunWritesHTML verifies that Service.Run delegates to
+// its Browser, writes the returned HTML bytes to the requested
+// OutputPath verbatim, and surfaces the snapshot's title on success.
 func TestServiceRunWritesHTML(t *testing.T) {
 	out := filepath.Join(t.TempDir(), "page.html")
 	svc := Service{
