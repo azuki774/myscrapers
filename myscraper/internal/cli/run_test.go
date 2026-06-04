@@ -17,6 +17,9 @@ func (f fakeRunner) Run(ctx context.Context, req scrape.Request) (scrape.Result,
 	return f.result, f.err
 }
 
+// TestRunPrintsSavedPath verifies that cli.Run returns exit code 0
+// on success and writes the expected "saved <path> (<title>)" line
+// to stdout when the injected Runner reports a successful Result.
 func TestRunPrintsSavedPath(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
