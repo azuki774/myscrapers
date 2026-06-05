@@ -56,7 +56,9 @@ MYSCRAPER_CHROMIUM_ARGS="--no-sandbox --disable-dev-shm-usage --disable-blink-fe
 
 Note: Vpass (and other Akamai / Cloudflare-fronted sites) may still 403 the request on TLS / HTTP/2 fingerprint grounds; a headless chromium cannot always be made to look like a real desktop browser, and a residential proxy or real Chrome in headed mode may be the only reliable bypass.
 
-Debug trace: set `MYSCRAPER_DEBUG_DIR` to a directory path to capture a JSONL trace of every HTTP response and workflow step. Useful when Vpass or another front-end kills the browser before the form renders, since the page is gone by the time the error surfaces. Each line is a JSON object with `ts`, `event` (`response` / `step` / `error`), and event-specific fields. The file lives at `$MYSCRAPER_DEBUG_DIR/trace.jsonl`. No trace is written when the variable is unset.
+Debug trace: set `MYSCRAPER_DEBUG_DIR` to a directory path to capture a JSONL trace of every HTTP response and workflow step. Useful when Vpass or another front-end kills the browser before the form renders, since the page is gone by the time the error surfaces. Each line is a JSON object with `ts`, `event` (`response` / `body` / `step` / `error`), and event-specific fields. The file lives at `$MYSCRAPER_DEBUG_DIR/trace.jsonl`. No trace is written when the variable is unset.
+
+The `body` event is written asynchronously after each `response` event with a 1.5s cap; if the server never finishes the body (Vpass / Akamai behaviour), only the `response` line is written, so the listener never blocks the playwright event loop.
 
 ```bash
 mkdir -p /tmp/myscraper-debug

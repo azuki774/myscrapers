@@ -20,6 +20,14 @@ const (
 	// that serve many small responses.
 	maxBodyPreview = 512
 
+	// bodyCaptureTimeout caps how long the trace listener will wait
+	// for resp.Body() to return. Playwright's Body() is a synchronous
+	// CDP call that blocks until the body is fully received, so a
+	// server that opens the connection and never finishes the body
+	// (the Akamai / Vpass pattern) would otherwise freeze the
+	// listener goroutine and, with it, the entire CDP event loop.
+	bodyCaptureTimeout = 1500 * time.Millisecond
+
 	// debugTraceFilename is the file name written into the directory
 	// named by MYSCRAPER_DEBUG_DIR. The extension is jsonl so the
 	// file is line-oriented and tail-friendly.
@@ -72,23 +80,53 @@ func (d *debugTrace) close() {
 
 // recordResponse captures one HTTP response served to the page. It
 // is called from the playwright "response" event handler, which
-// runs in its own goroutine, so it locks before touching the shared
-// snapshot fields and the file.
+// runs in the same goroutine that processes every other CDP event,
+// so the body-capture work is delegated to a goroutine and capped
+// with bodyCaptureTimeout; otherwise a server that opens a
+// connection and never finishes the body would freeze the entire
+// event loop.
 func (d *debugTrace) recordResponse(resp playwright.Response) {
 	if d == nil || resp == nil {
 		return
 	}
 	headers, _ := resp.AllHeaders()
-	body, _ := resp.Body()
-	preview, bodySize := bodyPreview(body)
+	url := resp.URL()
+	status := resp.Status()
 
 	d.mu.Lock()
-	d.lastURL = resp.URL()
-	d.lastBodyPreview = preview
+	d.lastURL = url
+	d.lastBodyPreview = "" // refreshed later if the body goroutine wins
 	d.mu.Unlock()
 
-	line := formatResponseLine(debugNow(), resp.URL(), resp.Status(), contentType(headers), bodySize, preview)
-	d.appendLine(line)
+	d.appendLine(formatResponseLine(debugNow(), url, status, contentType(headers), 0, ""))
+	go d.captureBody(url, resp)
+}
+
+// captureBody reads resp.Body() in a goroutine, with a timeout. If
+// the body arrives in time, a "body" line is appended to the trace
+// and the lastBodyPreview snapshot is updated so a later error line
+// can include it. If the body does not arrive, nothing is written
+// beyond the "response" line that recordResponse already emitted.
+func (d *debugTrace) captureBody(url string, resp playwright.Response) {
+	if d == nil || resp == nil {
+		return
+	}
+	bodyCh := make(chan []byte, 1)
+	go func() {
+		body, _ := resp.Body()
+		bodyCh <- body
+	}()
+	select {
+	case body := <-bodyCh:
+		preview, size := bodyPreview(body)
+		d.mu.Lock()
+		d.lastBodyPreview = preview
+		d.mu.Unlock()
+		d.appendLine(formatBodyLine(debugNow(), url, size, preview))
+	case <-time.After(bodyCaptureTimeout):
+		// Body never arrived in time; the server likely closed
+		// the connection. Leave the response line as-is and move on.
+	}
 }
 
 // recordStep captures the start of one workflow step. The caller is
@@ -166,6 +204,19 @@ func formatResponseLine(ts, url string, status int, contentType string, bodySize
 		"url":          url,
 		"status":       status,
 		"content_type": contentType,
+		"body_size":    bodySize,
+		"body_preview": bodyPreview,
+	})
+}
+
+// formatBodyLine returns a JSONL line carrying the body preview
+// captured after the initial "response" line. It shares the URL
+// with the response line so a reader can correlate the two.
+func formatBodyLine(ts, url string, bodySize int, bodyPreview string) string {
+	return marshalLine(map[string]any{
+		"ts":           ts,
+		"event":        "body",
+		"url":          url,
 		"body_size":    bodySize,
 		"body_preview": bodyPreview,
 	})

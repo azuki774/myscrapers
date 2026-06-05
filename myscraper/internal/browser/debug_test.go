@@ -6,6 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/playwright-community/playwright-go"
 )
 
 func TestFormatResponseLine(t *testing.T) {
@@ -180,5 +183,172 @@ func TestOpenDebugTraceDisabled(t *testing.T) {
 	t.Setenv("MYSCRAPER_DEBUG_DIR", "   ")
 	if got := openDebugTrace(); got != nil {
 		t.Fatalf("openDebugTrace() with whitespace env = %v, want nil", got)
+	}
+}
+
+// fakeResponse is a minimal playwright.Response used to exercise the
+// body-capture goroutine without a real browser. Only the methods
+// the trace listener actually calls are implemented; the rest panic
+// so accidental coupling is caught.
+type fakeResponse struct {
+	url        string
+	status     int
+	headers    map[string]string
+	body       []byte
+	bodyDelay  time.Duration
+}
+
+func (f fakeResponse) URL() string                                  { return f.url }
+func (f fakeResponse) Status() int                                 { return f.status }
+func (f fakeResponse) AllHeaders() (map[string]string, error)       { return f.headers, nil }
+func (f fakeResponse) Body() ([]byte, error) {
+	if f.bodyDelay > 0 {
+		time.Sleep(f.bodyDelay)
+	}
+	return f.body, nil
+}
+
+// stub the rest of the playwright.Response surface so the type
+// satisfies the interface and the compiler enforces no new method
+// dependencies sneak in silently. Unused methods return zero values
+// rather than panicking so a future reader does not get a misleading
+// "not used" message for a method that turns out to be used.
+func (fakeResponse) Headers() map[string]string { return nil }
+func (fakeResponse) HeadersArray() ([]playwright.NameValue, error) {
+	return nil, nil
+}
+func (fakeResponse) HeaderValue(string) (string, error)    { return "", nil }
+func (fakeResponse) HeaderValues(string) ([]string, error) { return nil, nil }
+func (fakeResponse) StatusText() string                    { return "" }
+func (fakeResponse) Ok() bool                              { return false }
+func (fakeResponse) Text() (string, error)                 { return "", nil }
+func (fakeResponse) JSON(any) error                        { return nil }
+func (fakeResponse) Finished() error                       { return nil }
+func (fakeResponse) Frame() playwright.Frame               { return nil }
+func (fakeResponse) Request() playwright.Request           { return nil }
+func (fakeResponse) FromServiceWorker() bool               { return false }
+func (fakeResponse) SecurityDetails() (*playwright.ResponseSecurityDetailsResult, error) {
+	return nil, nil
+}
+func (fakeResponse) ServerAddr() (*playwright.ResponseServerAddrResult, error) {
+	return nil, nil
+}
+
+func TestRecordResponseFastBody(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("MYSCRAPER_DEBUG_DIR", dir)
+
+	trace := openDebugTrace()
+	if trace == nil {
+		t.Fatal("openDebugTrace() returned nil")
+	}
+	t.Cleanup(func() { trace.close() })
+
+	trace.recordResponse(fakeResponse{
+		url:     "https://www.smbc-card.com/index.jsp",
+		status:  403,
+		headers: map[string]string{"content-type": "text/html"},
+		body:    []byte("<html>Access Denied</html>"),
+	})
+
+	// Wait briefly for the body goroutine to write its line.
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		got, _ := os.ReadFile(filepath.Join(dir, debugTraceFilename))
+		if strings.Count(string(got), "\n") >= 2 {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	got, err := os.ReadFile(filepath.Join(dir, debugTraceFilename))
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	lines := strings.Split(strings.TrimRight(string(got), "\n"), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("got %d lines, want 2: %q", len(lines), string(got))
+	}
+	var first, second map[string]any
+	_ = json.Unmarshal([]byte(lines[0]), &first)
+	_ = json.Unmarshal([]byte(lines[1]), &second)
+	if first["event"] != "response" {
+		t.Fatalf("lines[0].event = %v, want response", first["event"])
+	}
+	if got, _ := first["status"].(float64); int(got) != 403 {
+		t.Fatalf("lines[0].status = %v, want 403", first["status"])
+	}
+	if first["body_preview"] != "" {
+		t.Fatalf("lines[0].body_preview = %v, want empty (body captured separately)", first["body_preview"])
+	}
+	if second["event"] != "body" {
+		t.Fatalf("lines[1].event = %v, want body", second["event"])
+	}
+	if second["url"] != "https://www.smbc-card.com/index.jsp" {
+		t.Fatalf("lines[1].url = %v", second["url"])
+	}
+	if second["body_preview"] != "<html>Access Denied</html>" {
+		t.Fatalf("lines[1].body_preview = %v", second["body_preview"])
+	}
+}
+
+func TestRecordResponseSlowBodyDoesNotBlockListener(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("MYSCRAPER_DEBUG_DIR", dir)
+
+	trace := openDebugTrace()
+	if trace == nil {
+		t.Fatal("openDebugTrace() returned nil")
+	}
+	t.Cleanup(func() { trace.close() })
+
+	// Body that takes much longer than the listener should wait.
+	// If the listener blocks on Body(), the assertion below will
+	// time out and the test will fail.
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		trace.recordResponse(fakeResponse{
+			url:       "https://www.smbc-card.com/index.jsp",
+			status:    200,
+			headers:   map[string]string{"content-type": "text/html"},
+			bodyDelay: 5 * time.Second,
+			body:      []byte("<html>ok</html>"),
+		})
+	}()
+	select {
+	case <-done:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("recordResponse blocked on Body(); the listener must return immediately")
+	}
+
+	// The response line is on disk; the body line is not (and
+	// will not be, within the body capture timeout).
+	got, _ := os.ReadFile(filepath.Join(dir, debugTraceFilename))
+	if !strings.Contains(string(got), `"event":"response"`) {
+		t.Fatalf("trace missing response line: %q", string(got))
+	}
+	if strings.Contains(string(got), `"event":"body"`) {
+		t.Fatalf("trace should not contain body line yet, got: %q", string(got))
+	}
+}
+
+func TestFormatBodyLine(t *testing.T) {
+	line := formatBodyLine("2026-06-05T00:00:00Z", "https://example.com", 42, "hello")
+	var obj map[string]any
+	if err := json.Unmarshal([]byte(line), &obj); err != nil {
+		t.Fatalf("Unmarshal: %v; line=%q", err, line)
+	}
+	if obj["event"] != "body" {
+		t.Fatalf("event = %v, want body", obj["event"])
+	}
+	if obj["url"] != "https://example.com" {
+		t.Fatalf("url = %v", obj["url"])
+	}
+	if got, _ := obj["body_size"].(float64); int(got) != 42 {
+		t.Fatalf("body_size = %v, want 42", obj["body_size"])
+	}
+	if obj["body_preview"] != "hello" {
+		t.Fatalf("body_preview = %v", obj["body_preview"])
 	}
 }
