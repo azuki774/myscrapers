@@ -228,8 +228,18 @@ func (p playwrightInteractivePage) Goto(url string) error {
 	if p.trace != nil {
 		p.trace.recordStep("Goto", url)
 	}
+	// WaitUntilStateDomcontentloaded is intentionally less strict
+	// than networkidle. Vpass (and most Akamai / Cloudflare-fronted
+	// sites) keep connections open with analytics, websockets, or
+	// long-polling, so networkidle never fires and the default
+	// timeout can leave the CDP channel in a state where the call
+	// appears to hang. domcontentloaded fires as soon as the HTML
+	// DOM is parsed, which is enough for the login form to be
+	// present. The explicit 15s timeout turns hangs into errors so
+	// the workflow can surface them.
 	_, err := p.page.Goto(url, playwright.PageGotoOptions{
-		WaitUntil: playwright.WaitUntilStateNetworkidle,
+		WaitUntil: playwright.WaitUntilStateDomcontentloaded,
+		Timeout:   playwright.Float(15000),
 	})
 	return err
 }
@@ -258,7 +268,11 @@ func (p playwrightInteractivePage) WaitForURL(pattern string) error {
 	if p.trace != nil {
 		p.trace.recordStep("WaitForURL", pattern)
 	}
-	return p.page.WaitForURL(pattern)
+	// Mirror the Goto timeout: a 15s cap turns hangs into errors
+	// when Vpass serves a page that never reaches the expected URL.
+	return p.page.WaitForURL(pattern, playwright.PageWaitForURLOptions{
+		Timeout: playwright.Float(15000),
+	})
 }
 
 func (p playwrightInteractivePage) Title() (string, error) {
