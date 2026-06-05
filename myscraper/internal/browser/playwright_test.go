@@ -3,6 +3,7 @@ package browser
 import (
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -58,5 +59,23 @@ func TestChromiumLaunchArgs(t *testing.T) {
 				t.Fatalf("chromiumLaunchArgs() = %#v, want %#v", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestDefaultUserAgent(t *testing.T) {
+	ua := defaultUserAgent
+	if ua == "" {
+		t.Fatal("defaultUserAgent is empty")
+	}
+	if !strings.HasPrefix(ua, "Mozilla/5.0 ") {
+		t.Fatalf("defaultUserAgent = %q, want a Mozilla/5.0 prefix", ua)
+	}
+	if !strings.Contains(ua, "Chrome/") {
+		t.Fatalf("defaultUserAgent = %q, want a Chrome/ token", ua)
+	}
+	// Reject the exact default UA that stock Playwright ships, since
+	// that is the value the Vpass Akamai block was triggering on.
+	if strings.Contains(ua, "HeadlessChrome") {
+		t.Fatalf("defaultUserAgent = %q, must not advertise HeadlessChrome", ua)
 	}
 }

@@ -83,6 +83,21 @@ func chromiumLaunchArgs() []string {
 	return fields
 }
 
+// defaultUserAgent is the User-Agent string used for every Playwright
+// context opened by this package. It is a real Chrome 148 UA on
+// Linux x86_64 — chosen to match the chromium binary version this
+// repo's dev shell ships, which avoids the "UA says 120 but JS
+// reports 148" inconsistency that some bot detectors flag. The value
+// is intentionally hardcoded for now (a MYSCRAPER_USER_AGENT env
+// var can be added later if the Vpass block changes shape). Sites
+// that front themselves with Akamai Bot Manager or similar will
+// still 403 the default Playwright fingerprint (TLS / HTTP/2
+// signature, navigator.webdriver), so callers should also pass
+// --disable-blink-features=AutomationControlled in
+// MYSCRAPER_CHROMIUM_ARGS; that flag lives at the launch layer
+// while this constant lives at the context layer.
+const defaultUserAgent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"
+
 // withPage starts a Playwright-managed chromium browser, opens a new
 // page, and hands it to run. It installs the driver, launches the
 // browser, and tears everything down before returning so callers do
@@ -120,7 +135,15 @@ func withPage(
 	}
 	defer browser.Close()
 
-	page, err := browser.NewPage()
+	browserContext, err := browser.NewContext(playwright.BrowserNewContextOptions{
+		UserAgent: playwright.String(defaultUserAgent),
+	})
+	if err != nil {
+		return scrape.PageSnapshot{}, fmt.Errorf("new browser context: %w", err)
+	}
+	defer browserContext.Close()
+
+	page, err := browserContext.NewPage()
 	if err != nil {
 		return scrape.PageSnapshot{}, fmt.Errorf("new page: %w", err)
 	}

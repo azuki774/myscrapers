@@ -47,6 +47,15 @@ MYSCRAPER_CHROMIUM_ARGS="--no-sandbox --disable-dev-shm-usage" \
   go run ./cmd/myscraper --mode smbc-card-webmeisai --out tmp/smbccard-webmeisai.html
 ```
 
+User-Agent: the browser package overrides the default Playwright User-Agent with a hardcoded Chrome 148 / Linux x86_64 string, set on every `BrowserContext`. The intent is to avoid the `HeadlessChrome` UA that stock Playwright ships, which the Vpass Akamai front-end flags as automated. Pair with `--disable-blink-features=AutomationControlled` in `MYSCRAPER_CHROMIUM_ARGS` to also drop the `navigator.webdriver` flag, since the two signals are usually checked together.
+
+```bash
+MYSCRAPER_CHROMIUM_ARGS="--no-sandbox --disable-dev-shm-usage --disable-blink-features=AutomationControlled" \
+  go run ./cmd/myscraper --mode smbc-card-webmeisai --out tmp/smbccard-webmeisai.html
+```
+
+Note: Vpass (and other Akamai / Cloudflare-fronted sites) may still 403 the request on TLS / HTTP/2 fingerprint grounds; a headless chromium cannot always be made to look like a real desktop browser, and a residential proxy or real Chrome in headed mode may be the only reliable bypass.
+
 ## myscrapers-sbi
 - SBIのポートフォリオを保存
 - https://site1.sbisec.co.jp/ETGate/ に自動的にログインして、ポートフォリオの表ごとに保存する。
