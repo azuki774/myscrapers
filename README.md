@@ -14,6 +14,32 @@ PLAYWRIGHT_E2E=1 go test ./e2e -run TestGitHubSmoke -v
 go run ./cmd/myscraper --url https://github.com --out tmp/github.html
 ```
 
+### myscraper SMBC Card WEB明細 HTML dump
+
+Current scope: authenticated login and raw HTML snapshot only. CSV parsing for the WEB明細 table comes later.
+
+Environment variables:
+
+- `SMBC_VPASS_ID` and `SMBC_VPASS_PASSWORD`
+- or the legacy fallback pair `user` and `pass`
+
+Run:
+
+```bash
+nix develop
+cd myscraper
+go test ./...
+go run ./cmd/myscraper --mode smbc-card-webmeisai --out tmp/smbccard-webmeisai.html
+```
+
+Optional real-browser smoke test:
+
+```bash
+nix develop
+cd myscraper
+PLAYWRIGHT_E2E_SMBCCARD=1 go test ./e2e -run TestSMBCCardWebMeisaiSmoke -v
+```
+
 ## myscrapers-sbi
 - SBIのポートフォリオを保存
 - https://site1.sbisec.co.jp/ETGate/ に自動的にログインして、ポートフォリオの表ごとに保存する。
