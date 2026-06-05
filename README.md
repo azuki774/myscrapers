@@ -14,6 +14,61 @@ PLAYWRIGHT_E2E=1 go test ./e2e -run TestGitHubSmoke -v
 go run ./cmd/myscraper --url https://github.com --out tmp/github.html
 ```
 
+### myscraper SMBC Card WEB明細 HTML dump
+
+Current scope: authenticated login and raw HTML snapshot only. CSV parsing for the WEB明細 table comes later.
+
+Environment variables:
+
+- `SMBC_VPASS_ID` and `SMBC_VPASS_PASSWORD`
+- or the legacy fallback pair `user` and `pass`
+
+Run:
+
+```bash
+nix develop
+cd myscraper
+go test ./...
+go run ./cmd/myscraper --mode smbc-card-webmeisai --out tmp/smbccard-webmeisai.html
+```
+
+Optional real-browser smoke test:
+
+```bash
+nix develop
+cd myscraper
+PLAYWRIGHT_E2E_SMBCCARD=1 go test ./e2e -run TestSMBCCardWebMeisaiSmoke -v
+```
+
+Chromium launch flags: chromium needs extra flags in some environments (running as root, inside a container, or in the nix dev shell where the SUID sandbox cannot start). Pass them through the `MYSCRAPER_CHROMIUM_ARGS` environment variable, whitespace-separated. Default is none.
+
+```bash
+MYSCRAPER_CHROMIUM_ARGS="--no-sandbox --disable-dev-shm-usage" \
+  go run ./cmd/myscraper --mode smbc-card-webmeisai --out tmp/smbccard-webmeisai.html
+```
+
+User-Agent: the browser package overrides the default Playwright User-Agent with a hardcoded Chrome 148 / Linux x86_64 string, set on every `BrowserContext`. The intent is to avoid the `HeadlessChrome` UA that stock Playwright ships, which the Vpass Akamai front-end flags as automated. Pair with `--disable-blink-features=AutomationControlled` in `MYSCRAPER_CHROMIUM_ARGS` to also drop the `navigator.webdriver` flag, since the two signals are usually checked together.
+
+```bash
+MYSCRAPER_CHROMIUM_ARGS="--no-sandbox --disable-dev-shm-usage --disable-blink-features=AutomationControlled" \
+  go run ./cmd/myscraper --mode smbc-card-webmeisai --out tmp/smbccard-webmeisai.html
+```
+
+Note: Vpass (and other Akamai / Cloudflare-fronted sites) may still 403 the request on TLS / HTTP/2 fingerprint grounds; a headless chromium cannot always be made to look like a real desktop browser, and a residential proxy or real Chrome in headed mode may be the only reliable bypass.
+
+Debug trace: set `MYSCRAPER_DEBUG_DIR` to a directory path to capture a JSONL trace of every HTTP response and workflow step. Useful when Vpass or another front-end kills the browser before the form renders, since the page is gone by the time the error surfaces. Each line is a JSON object with `ts`, `event` (`response` / `body` / `step` / `error`), and event-specific fields. The file lives at `$MYSCRAPER_DEBUG_DIR/trace.jsonl`. No trace is written when the variable is unset.
+
+The `body` event is written asynchronously after each `response` event with a 1.5s cap; if the server never finishes the body (Vpass / Akamai behaviour), only the `response` line is written, so the listener never blocks the playwright event loop.
+
+```bash
+mkdir -p /tmp/myscraper-debug
+MYSCRAPER_DEBUG_DIR=/tmp/myscraper-debug \
+MYSCRAPER_CHROMIUM_ARGS="--no-sandbox --disable-dev-shm-usage --disable-blink-features=AutomationControlled" \
+  go run ./cmd/myscraper --mode smbc-card-webmeisai --out tmp/smbccard-webmeisai.html
+# inspect the trace
+jq -c 'select(.event=="response")' /tmp/myscraper-debug/trace.jsonl
+```
+
 ## myscrapers-sbi
 - SBIのポートフォリオを保存
 - https://site1.sbisec.co.jp/ETGate/ に自動的にログインして、ポートフォリオの表ごとに保存する。

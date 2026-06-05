@@ -20,7 +20,8 @@ type Runner interface {
 // either a one-line "saved" success message to stdout or the error to
 // stderr. The exit code is 0 on success, 1 on a runner error, and 2
 // on argument parsing failure so callers can distinguish the two
-// failure modes.
+// failure modes. The parsed --mode is forwarded to the Runner so
+// downstream code can dispatch on it.
 func Run(args []string, stdout, stderr io.Writer, runner Runner) int {
 	opts, err := ParseArgs(args)
 	if err != nil {
@@ -29,6 +30,7 @@ func Run(args []string, stdout, stderr io.Writer, runner Runner) int {
 	}
 
 	result, err := runner.Run(context.Background(), scrape.Request{
+		Mode:       opts.Mode,
 		URL:        opts.URL,
 		OutputPath: opts.OutputPath,
 		Headless:   opts.Headless,
