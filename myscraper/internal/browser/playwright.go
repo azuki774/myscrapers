@@ -207,7 +207,16 @@ func withPage(
 		if trace != nil {
 			trace.recordError(err)
 		}
-		return scrape.PageSnapshot{}, err
+		// Bypass the deferred browser.Close / browserContext.Close /
+		// pw.Stop calls and exit immediately. The Goto / Fill / Click
+		// goroutines inside the run callback are likely still
+		// blocked on a stuck chromium CDP channel, and those defers
+		// would hang trying to send a close command on the same
+		// channel. The chromium subprocess is reaped by the OS when
+		// the parent dies.
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+		return scrape.PageSnapshot{}, err // unreachable
 	}
 }
 
