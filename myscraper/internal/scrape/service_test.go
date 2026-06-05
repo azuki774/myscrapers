@@ -43,7 +43,7 @@ func TestServiceRunFetchModeWritesHTML(t *testing.T) {
 	svc := Service{Browser: browser}
 
 	result, err := svc.Run(context.Background(), Request{
-		Mode:       "fetch-url",
+		Mode:       ModeFetchURL,
 		URL:        "https://github.com",
 		OutputPath: out,
 		Headless:   true,

@@ -9,12 +9,16 @@ import (
 	"flag"
 	"io"
 
+	"github.com/azuki774/myscrapers/myscraper/internal/scrape"
 	"github.com/azuki774/myscrapers/myscraper/internal/smbccard"
 )
 
 // ModeFetchURL is the default mode: fetch a single URL anonymously and
-// dump its HTML snapshot. It preserves the v1 CLI shape.
-const ModeFetchURL = "fetch-url"
+// dump its HTML snapshot. It preserves the v1 CLI shape. The
+// authoritative value lives in package scrape to avoid a cli↔scrape
+// import cycle; this constant is a re-export so existing callers
+// (and tests in this package) keep their cli-prefix-free spelling.
+const ModeFetchURL = scrape.ModeFetchURL
 
 // Options is the parsed view of the myscraper command-line flags.
 // OutputPath falls back to a per-mode default during flag parsing, so

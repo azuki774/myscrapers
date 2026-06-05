@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/azuki774/myscrapers/myscraper/internal/scrape"
+	"github.com/azuki774/myscrapers/myscraper/internal/smbccard"
 )
 
 type fakeRunner struct {
@@ -33,7 +34,7 @@ func TestRunPrintsSavedPath(t *testing.T) {
 	}
 
 	exitCode := Run(
-		[]string{"--mode", "smbc-card-webmeisai", "--out", "tmp/smbc.html"},
+		[]string{"--mode", smbccard.ModeWebMeisaiHTMLDump, "--out", "tmp/smbc.html"},
 		stdout,
 		stderr,
 		runner,
@@ -42,8 +43,8 @@ func TestRunPrintsSavedPath(t *testing.T) {
 	if exitCode != 0 {
 		t.Fatalf("exitCode = %d, want 0; stderr = %q", exitCode, stderr.String())
 	}
-	if runner.req.Mode != "smbc-card-webmeisai" {
-		t.Fatalf("Mode = %q, want %q", runner.req.Mode, "smbc-card-webmeisai")
+	if runner.req.Mode != smbccard.ModeWebMeisaiHTMLDump {
+		t.Fatalf("Mode = %q, want %q", runner.req.Mode, smbccard.ModeWebMeisaiHTMLDump)
 	}
 	if stdout.String() != "saved tmp/smbc.html (WEB明細)\n" {
 		t.Fatalf("stdout = %q", stdout.String())

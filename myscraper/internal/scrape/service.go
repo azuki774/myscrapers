@@ -80,7 +80,7 @@ func (s Service) Run(ctx context.Context, req Request) (Result, error) {
 	)
 
 	switch req.Mode {
-	case "", "fetch-url":
+	case "", ModeFetchURL:
 		snapshot, err = s.Browser.Fetch(ctx, req.URL, req.Headless)
 	case smbccard.ModeWebMeisaiHTMLDump:
 		creds, loadErr := smbccard.LoadCredentialsFromEnv()
