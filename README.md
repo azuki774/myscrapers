@@ -40,6 +40,13 @@ cd myscraper
 PLAYWRIGHT_E2E_SMBCCARD=1 go test ./e2e -run TestSMBCCardWebMeisaiSmoke -v
 ```
 
+Chromium launch flags: chromium needs extra flags in some environments (running as root, inside a container, or in the nix dev shell where the SUID sandbox cannot start). Pass them through the `MYSCRAPER_CHROMIUM_ARGS` environment variable, whitespace-separated. Default is none.
+
+```bash
+MYSCRAPER_CHROMIUM_ARGS="--no-sandbox --disable-dev-shm-usage" \
+  go run ./cmd/myscraper --mode smbc-card-webmeisai --out tmp/smbccard-webmeisai.html
+```
+
 ## myscrapers-sbi
 - SBIのポートフォリオを保存
 - https://site1.sbisec.co.jp/ETGate/ に自動的にログインして、ポートフォリオの表ごとに保存する。

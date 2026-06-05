@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/azuki774/myscrapers/myscraper/internal/scrape"
 	"github.com/azuki774/myscrapers/myscraper/internal/smbccard"
@@ -59,6 +60,29 @@ func chromiumExecutablePath() (string, error) {
 	return "", fmt.Errorf("no chromium-compatible browser found in PATH")
 }
 
+// chromiumLaunchArgs returns the extra command-line arguments that
+// should be passed to chromium on launch. They come from the
+// MYSCRAPER_CHROMIUM_ARGS environment variable, which is split on
+// any run of unicode whitespace. The variable is an escape hatch
+// for environments where the default sandboxed launch fails (e.g.
+// running as root in a container, /dev/shm too small, or running
+// inside the nix dev shell where chromium's SUID sandbox cannot
+// start). When the variable is unset or whitespace-only, the
+// returned slice is nil so the Launch options stay minimal.
+//
+// Example: MYSCRAPER_CHROMIUM_ARGS="--no-sandbox --disable-dev-shm-usage"
+func chromiumLaunchArgs() []string {
+	raw := os.Getenv("MYSCRAPER_CHROMIUM_ARGS")
+	if raw == "" {
+		return nil
+	}
+	fields := strings.Fields(raw)
+	if len(fields) == 0 {
+		return nil
+	}
+	return fields
+}
+
 // withPage starts a Playwright-managed chromium browser, opens a new
 // page, and hands it to run. It installs the driver, launches the
 // browser, and tears everything down before returning so callers do
@@ -89,6 +113,7 @@ func withPage(
 	browser, err := pw.Chromium.Launch(playwright.BrowserTypeLaunchOptions{
 		ExecutablePath: playwright.String(executablePath),
 		Headless:       playwright.Bool(headless),
+		Args:           chromiumLaunchArgs(),
 	})
 	if err != nil {
 		return scrape.PageSnapshot{}, fmt.Errorf("launch chromium: %w", err)
