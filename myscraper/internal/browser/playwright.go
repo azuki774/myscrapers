@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/azuki774/myscrapers/myscraper/internal/scrape"
 	"github.com/azuki774/myscrapers/myscraper/internal/smbccard"
@@ -98,6 +99,20 @@ func chromiumLaunchArgs() []string {
 // while this constant lives at the context layer.
 const defaultUserAgent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"
 
+// hardStepTimeout caps each individual InteractivePage operation
+// (Goto, Fill, Click, WaitForURL). The page-level Timeout option
+// in playwright only covers the navigation state, not the
+// underlying HTTP request, and the Go binding's channel.Send blocks
+// until the browser replies. A server that never even sends
+// headers would otherwise leave the operation hanging forever.
+const hardStepTimeout = 20 * time.Second
+
+// hardRunTimeout caps the entire browser run (the run callback
+// passed to withPage). Even if each step has its own hard timeout,
+// we still want an outer cap so a series of failed steps cannot
+// accumulate to a multi-minute hang.
+const hardRunTimeout = 90 * time.Second
+
 // withPage starts a Playwright-managed chromium browser, opens a new
 // page, and hands it to run. It installs the driver, launches the
 // browser, and tears everything down before returning so callers do
@@ -113,6 +128,18 @@ func withPage(
 	headless bool,
 	run func(page playwright.Page, trace *debugTrace) (scrape.PageSnapshot, error),
 ) (scrape.PageSnapshot, error) {
+	// Hard outer cap on the entire run. The page-level Timeout
+	// option only covers the navigation state, not the underlying
+	// HTTP request, and the Go binding's channel.Send blocks until
+	// the browser replies. If Vpass (or any other site) hangs the
+	// TCP connection, the navigation never starts and the page
+	// timeout never fires. The outer cap aborts the workflow and
+	// returns a clear error so the user is not stuck ^C-ing the
+	// process. The browser and driver are torn down by the
+	// deferred Close / Stop calls regardless of which path returns.
+	ctx, cancel := context.WithTimeout(ctx, hardRunTimeout)
+	defer cancel()
+
 	if err := InstallDriver(); err != nil {
 		return scrape.PageSnapshot{}, fmt.Errorf("install playwright driver: %w", err)
 	}
@@ -159,11 +186,29 @@ func withPage(
 		})
 	}
 
-	snapshot, runErr := run(page, trace)
-	if runErr != nil && trace != nil {
-		trace.recordError(runErr)
+	type runResult struct {
+		snap scrape.PageSnapshot
+		err  error
 	}
-	return snapshot, runErr
+	done := make(chan runResult, 1)
+	go func() {
+		s, e := run(page, trace)
+		done <- runResult{s, e}
+	}()
+
+	select {
+	case r := <-done:
+		if r.err != nil && trace != nil {
+			trace.recordError(r.err)
+		}
+		return r.snap, r.err
+	case <-ctx.Done():
+		err := fmt.Errorf("browser run exceeded hard timeout of %s", hardRunTimeout)
+		if trace != nil {
+			trace.recordError(err)
+		}
+		return scrape.PageSnapshot{}, err
+	}
 }
 
 // Fetch opens url in a headless (or headed) Chromium driven by
@@ -228,20 +273,29 @@ func (p playwrightInteractivePage) Goto(url string) error {
 	if p.trace != nil {
 		p.trace.recordStep("Goto", url)
 	}
-	// WaitUntilStateDomcontentloaded is intentionally less strict
-	// than networkidle. Vpass (and most Akamai / Cloudflare-fronted
-	// sites) keep connections open with analytics, websockets, or
-	// long-polling, so networkidle never fires and the default
-	// timeout can leave the CDP channel in a state where the call
-	// appears to hang. domcontentloaded fires as soon as the HTML
-	// DOM is parsed, which is enough for the login form to be
-	// present. The explicit 15s timeout turns hangs into errors so
-	// the workflow can surface them.
-	_, err := p.page.Goto(url, playwright.PageGotoOptions{
-		WaitUntil: playwright.WaitUntilStateDomcontentloaded,
-		Timeout:   playwright.Float(15000),
-	})
-	return err
+	// WaitUntilStateCommit is the most lenient wait condition: it
+	// returns as soon as the browser has received the response
+	// headers. Vpass keeps connections open with analytics and
+	// long-polling, so the stricter conditions (load /
+	// domcontentloaded / networkidle) may never fire, and the page
+	// timeout option only covers the navigation state, not the
+	// underlying HTTP request. commit is also wrapped in a
+	// goroutine with a hard timeout, so a server that never even
+	// sends headers can no longer hang the workflow.
+	done := make(chan error, 1)
+	go func() {
+		_, err := p.page.Goto(url, playwright.PageGotoOptions{
+			WaitUntil: playwright.WaitUntilStateCommit,
+			Timeout:   playwright.Float(15000),
+		})
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		return err
+	case <-time.After(hardStepTimeout):
+		return fmt.Errorf("goto %s: hard timeout of %s exceeded (page-level Goto did not return)", url, hardStepTimeout)
+	}
 }
 
 func (p playwrightInteractivePage) FillByLabel(label, value string) error {
@@ -252,27 +306,55 @@ func (p playwrightInteractivePage) FillByLabel(label, value string) error {
 	if p.trace != nil {
 		p.trace.recordStep("FillByLabel", label)
 	}
-	return p.page.GetByLabel(label).Fill(value)
+	done := make(chan error, 1)
+	go func() {
+		done <- p.page.GetByLabel(label).Fill(value)
+	}()
+	select {
+	case err := <-done:
+		return err
+	case <-time.After(hardStepTimeout):
+		return fmt.Errorf("fill %s: hard timeout of %s exceeded", label, hardStepTimeout)
+	}
 }
 
 func (p playwrightInteractivePage) ClickButton(name string) error {
 	if p.trace != nil {
 		p.trace.recordStep("ClickButton", name)
 	}
-	return p.page.GetByRole(*playwright.AriaRoleButton, playwright.PageGetByRoleOptions{
-		Name: name,
-	}).Click()
+	done := make(chan error, 1)
+	go func() {
+		done <- p.page.GetByRole(*playwright.AriaRoleButton, playwright.PageGetByRoleOptions{
+			Name: name,
+		}).Click()
+	}()
+	select {
+	case err := <-done:
+		return err
+	case <-time.After(hardStepTimeout):
+		return fmt.Errorf("click %s: hard timeout of %s exceeded", name, hardStepTimeout)
+	}
 }
 
 func (p playwrightInteractivePage) WaitForURL(pattern string) error {
 	if p.trace != nil {
 		p.trace.recordStep("WaitForURL", pattern)
 	}
-	// Mirror the Goto timeout: a 15s cap turns hangs into errors
-	// when Vpass serves a page that never reaches the expected URL.
-	return p.page.WaitForURL(pattern, playwright.PageWaitForURLOptions{
-		Timeout: playwright.Float(15000),
-	})
+	// Mirror the Goto hard-timeout pattern. WaitForURL has a
+	// 15s CDP timeout, but the channel.Send call can still hang
+	// indefinitely when the browser is unresponsive.
+	done := make(chan error, 1)
+	go func() {
+		done <- p.page.WaitForURL(pattern, playwright.PageWaitForURLOptions{
+			Timeout: playwright.Float(15000),
+		})
+	}()
+	select {
+	case err := <-done:
+		return err
+	case <-time.After(hardStepTimeout):
+		return fmt.Errorf("wait for url %s: hard timeout of %s exceeded", pattern, hardStepTimeout)
+	}
 }
 
 func (p playwrightInteractivePage) Title() (string, error) {
