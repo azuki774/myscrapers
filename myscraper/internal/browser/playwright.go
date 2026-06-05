@@ -101,14 +101,17 @@ const defaultUserAgent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KH
 // withPage starts a Playwright-managed chromium browser, opens a new
 // page, and hands it to run. It installs the driver, launches the
 // browser, and tears everything down before returning so callers do
-// not need to manage Playwright's lifecycle directly.
+// not need to manage Playwright's lifecycle directly. When
+// MYSCRAPER_DEBUG_DIR is set, the run also writes a JSONL trace of
+// every HTTP response and workflow step into a file inside that
+// directory.
 func withPage(
 	// ctx is part of the Browser interface contract and is reserved
 	// for future cancellation; the current implementation does not
 	// plumb it into the playwright driver.
 	ctx context.Context,
 	headless bool,
-	run func(page playwright.Page) (scrape.PageSnapshot, error),
+	run func(page playwright.Page, trace *debugTrace) (scrape.PageSnapshot, error),
 ) (scrape.PageSnapshot, error) {
 	if err := InstallDriver(); err != nil {
 		return scrape.PageSnapshot{}, fmt.Errorf("install playwright driver: %w", err)
@@ -148,13 +151,28 @@ func withPage(
 		return scrape.PageSnapshot{}, fmt.Errorf("new page: %w", err)
 	}
 
-	return run(page)
+	trace := openDebugTrace()
+	defer trace.close()
+	if trace != nil {
+		page.On("response", func(resp playwright.Response) {
+			trace.recordResponse(resp)
+		})
+	}
+
+	snapshot, runErr := run(page, trace)
+	if runErr != nil && trace != nil {
+		trace.recordError(runErr)
+	}
+	return snapshot, runErr
 }
 
 // Fetch opens url in a headless (or headed) Chromium driven by
 // Playwright and returns the rendered page snapshot.
 func (PlaywrightBrowser) Fetch(ctx context.Context, url string, headless bool) (scrape.PageSnapshot, error) {
-	return withPage(ctx, headless, func(page playwright.Page) (scrape.PageSnapshot, error) {
+	return withPage(ctx, headless, func(page playwright.Page, trace *debugTrace) (scrape.PageSnapshot, error) {
+		if trace != nil {
+			trace.recordStep("Fetch", url)
+		}
 		if _, err := page.Goto(url); err != nil {
 			return scrape.PageSnapshot{}, fmt.Errorf("goto %s: %w", url, err)
 		}
@@ -182,8 +200,8 @@ func (PlaywrightBrowser) Fetch(ctx context.Context, url string, headless bool) (
 // smbccard.PageSnapshot is converted to scrape.PageSnapshot at the
 // boundary to keep the smbccard package free of any scrape import.
 func (PlaywrightBrowser) FetchSMBCCardWebMeisai(ctx context.Context, creds smbccard.Credentials, headless bool) (scrape.PageSnapshot, error) {
-	return withPage(ctx, headless, func(page playwright.Page) (scrape.PageSnapshot, error) {
-		snapshot, err := smbccard.CaptureWebMeisai(playwrightInteractivePage{page: page}, creds)
+	return withPage(ctx, headless, func(page playwright.Page, trace *debugTrace) (scrape.PageSnapshot, error) {
+		snapshot, err := smbccard.CaptureWebMeisai(playwrightInteractivePage{page: page, trace: trace}, creds)
 		if err != nil {
 			return scrape.PageSnapshot{}, err
 		}
@@ -199,12 +217,17 @@ func (PlaywrightBrowser) FetchSMBCCardWebMeisai(ctx context.Context, creds smbcc
 // smbccard.InteractivePage interface. It is unexported because the
 // only legitimate consumer is FetchSMBCCardWebMeisai in this same
 // package; callers outside the browser package should not need to
-// reach for Playwright types.
+// reach for Playwright types. The trace field is optional; when
+// nil, no step markers are written.
 type playwrightInteractivePage struct {
-	page playwright.Page
+	page  playwright.Page
+	trace *debugTrace
 }
 
 func (p playwrightInteractivePage) Goto(url string) error {
+	if p.trace != nil {
+		p.trace.recordStep("Goto", url)
+	}
 	_, err := p.page.Goto(url, playwright.PageGotoOptions{
 		WaitUntil: playwright.WaitUntilStateNetworkidle,
 	})
@@ -213,17 +236,28 @@ func (p playwrightInteractivePage) Goto(url string) error {
 
 func (p playwrightInteractivePage) FillByLabel(label, value string) error {
 	// Per the InteractivePage contract, adapters must not include the
-	// value (which can be a credential) in any returned error.
+	// value (which can be a credential) in any returned error, and
+	// must not include the value in the debug trace for the same
+	// reason.
+	if p.trace != nil {
+		p.trace.recordStep("FillByLabel", label)
+	}
 	return p.page.GetByLabel(label).Fill(value)
 }
 
 func (p playwrightInteractivePage) ClickButton(name string) error {
+	if p.trace != nil {
+		p.trace.recordStep("ClickButton", name)
+	}
 	return p.page.GetByRole(*playwright.AriaRoleButton, playwright.PageGetByRoleOptions{
 		Name: name,
 	}).Click()
 }
 
 func (p playwrightInteractivePage) WaitForURL(pattern string) error {
+	if p.trace != nil {
+		p.trace.recordStep("WaitForURL", pattern)
+	}
 	return p.page.WaitForURL(pattern)
 }
 
