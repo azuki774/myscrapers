@@ -7,7 +7,7 @@ services:
     container_name: myscrapers-mf
     environment:
       TZ: Asia/Tokyo
+      MF_OUTPUT_DIR: /data/out
     volumes:
-      - ./deployment/cookie.json:/data/cookie.json:ro
-      - ./deployment/out:/data
+      - ./deployment:/data
     command: ["moneyforward", "--fetch"]

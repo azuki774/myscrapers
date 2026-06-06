@@ -79,8 +79,10 @@ myscraper moneyforward --fetch --output-dir ./out --cookie-path ./cookie.json
 
 ### myscraper-mf local with podman compose
 
-`deployment/compose.yml` mounts `deployment/cookie.json` into the container as
-`/data/cookie.json` and writes scraper output to `deployment/out/`.
+`deployment/compose.yml` mounts the whole `deployment/` directory to `/data`.
+That keeps the cookie at `deployment/cookie.json` while still letting the
+scraper read `/data/cookie.json`, and `MF_OUTPUT_DIR=/data/out` keeps scrape
+output under `deployment/out/`.
 `deployment/cookie.json` is ignored by Git so the browser-exported cookie file
 does not get committed by accident.
 
@@ -95,6 +97,6 @@ podman compose -f deployment/compose.yml run --rm myscrapers-mf \
   moneyforward --update
 ```
 
-`podman-compose` may resolve bind mounts relative to the current working
-directory, so this file uses `./deployment/...` host paths and the commands
-above should be run from the repository root.
+If `deployment/cookie.json` was accidentally created as a directory by an older
+compose setup, remove it and recreate it as a regular file before running the
+container again.
