@@ -94,3 +94,7 @@ podman compose -f deployment/compose.yml run --rm myscrapers-mf
 podman compose -f deployment/compose.yml run --rm myscrapers-mf \
   moneyforward --update
 ```
+
+`podman-compose` may resolve bind mounts relative to the current working
+directory, so this file uses `./deployment/...` host paths and the commands
+above should be run from the repository root.

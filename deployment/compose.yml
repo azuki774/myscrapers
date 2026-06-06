@@ -8,6 +8,6 @@ services:
     environment:
       TZ: Asia/Tokyo
     volumes:
-      - ./cookie.json:/data/cookie.json:ro
-      - ./out:/data
+      - ./deployment/cookie.json:/data/cookie.json:ro
+      - ./deployment/out:/data
     command: ["moneyforward", "--fetch"]
