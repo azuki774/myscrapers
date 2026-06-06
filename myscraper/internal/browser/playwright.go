@@ -9,8 +9,8 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 
+	"github.com/azuki774/myscrapers/myscraper/internal/chromium"
 	"github.com/azuki774/myscrapers/myscraper/internal/scrape"
 	"github.com/playwright-community/playwright-go"
 )
@@ -43,19 +43,6 @@ func runOptions() *playwright.RunOptions {
 	}
 }
 
-// chromiumExecutablePath resolves the chromium binary that Playwright
-// should drive. The dev shell puts a system chromium on PATH, so we
-// look it up by name rather than bundling a browser. Order matches
-// the most common package names on Debian, Nix, and macOS.
-func chromiumExecutablePath() (string, error) {
-	for _, candidate := range []string{"chromium", "chromium-browser", "google-chrome", "google-chrome-stable"} {
-		if path, err := exec.LookPath(candidate); err == nil {
-			return path, nil
-		}
-	}
-	return "", fmt.Errorf("no chromium-compatible browser found in PATH")
-}
-
 // Fetch opens url in a headless (or headed) Chromium driven by
 // Playwright and returns the rendered page snapshot. The browser
 // process is started on each call and torn down before returning so
@@ -71,7 +58,7 @@ func (PlaywrightBrowser) Fetch(ctx context.Context, url string, headless bool) (
 	}
 	defer pw.Stop()
 
-	executablePath, err := chromiumExecutablePath()
+	executablePath, err := chromium.ExecutablePath()
 	if err != nil {
 		return scrape.PageSnapshot{}, err
 	}
