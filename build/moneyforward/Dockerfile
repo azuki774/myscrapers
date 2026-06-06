@@ -17,10 +17,12 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
       ca-certificates \
       curl \
+      gnupg \
       libglib2.0-0 \
       libnss3 \
       libgconf-2-4 \
-      libfontconfig1 && \
+      libfontconfig1 \
+      wget && \
     rm -rf /var/lib/apt/lists/*
 RUN wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - && \
     echo "deb http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list && \
