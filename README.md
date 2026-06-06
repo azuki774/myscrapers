@@ -1,5 +1,19 @@
 # myscrapers
 
+## myscraper (Go)
+- 新しい Go ベースの scraper 実装は `myscraper/` 配下にある
+- 既存 Python scraper は `src/` 配下に残し、legacy 扱いで維持する
+- 開発時は `nix develop` の上で `cd myscraper && go test ./...` を使う
+
+### myscraper CLI
+```bash
+nix develop
+cd myscraper
+go test ./internal/... -v
+PLAYWRIGHT_E2E=1 go test ./e2e -run TestGitHubSmoke -v
+go run ./cmd/myscraper --url https://github.com --out tmp/github.html
+```
+
 ## myscrapers-sbi
 - SBIのポートフォリオを保存
 - https://site1.sbisec.co.jp/ETGate/ に自動的にログインして、ポートフォリオの表ごとに保存する。
@@ -35,4 +49,30 @@
 
    $ python src/moneyforward/main.py --help
      これにより、利用可能なサブコマンドとオプションの一覧が表示されます。
+```
+
+### myscraper-mf (Go)
+
+The Go re-implementation of the MoneyForward scraper lives in `myscraper/`
+and is built into the same `myscrapers-mf` container image. The Python
+sources under `src/moneyforward/` are kept for legacy reference only.
+
+```bash
+nix develop
+cd myscraper
+go test ./internal/... -v
+MF_E2E=1 go test ./e2e -run TestMoneyforwardSmoke -v
+
+# scrape CF + asset history and write /data/cf.csv, /data/cf_lastmonth.csv,
+# /data/asset_history.csv
+myscraper moneyforward --fetch
+
+# same, with S3 upload
+myscraper moneyforward --fetch --s3-upload
+
+# press 一括更新 and モバイルSuica 更新
+myscraper moneyforward --update
+
+# override defaults
+myscraper moneyforward --fetch --output-dir ./out --cookie-path ./cookie.json
 ```
