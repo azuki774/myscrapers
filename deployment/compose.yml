@@ -1,10 +1,13 @@
 services:
-  myscrapers-mf-test:
+  myscrapers-mf:
+    build:
+      context: ..
+      dockerfile: build/moneyforward/Dockerfile
     image: myscrapers-mf:latest
     container_name: myscrapers-mf
     environment:
-      - TZ="JST-9"
+      TZ: Asia/Tokyo
     volumes:
-      # /data/cookie.json
-      - ./browser/:/data/
-    command: [ "moneyforward", "--fetch", "--s3-upload" ]
+      - ./cookie.json:/data/cookie.json:ro
+      - ./out:/data
+    command: ["moneyforward", "--fetch"]

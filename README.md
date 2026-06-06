@@ -76,3 +76,21 @@ myscraper moneyforward --update
 # override defaults
 myscraper moneyforward --fetch --output-dir ./out --cookie-path ./cookie.json
 ```
+
+### myscraper-mf local with podman compose
+
+`deployment/compose.yml` mounts `deployment/cookie.json` into the container as
+`/data/cookie.json` and writes scraper output to `deployment/out/`.
+`deployment/cookie.json` is ignored by Git so the browser-exported cookie file
+does not get committed by accident.
+
+```bash
+mkdir -p deployment/out
+cp /path/to/browser-exported-cookie.json deployment/cookie.json
+podman compose -f deployment/compose.yml build
+podman compose -f deployment/compose.yml run --rm myscrapers-mf
+
+# run update instead of fetch
+podman compose -f deployment/compose.yml run --rm myscrapers-mf \
+  moneyforward --update
+```
