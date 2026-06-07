@@ -19,6 +19,7 @@ const (
 	assetFilename       = "asset_history.csv"
 	cfNowDebugFilename  = "cf_now_debug.html"
 	cfLastDebugFilename = "cf_lastmonth_debug.html"
+	thisMonthXPath      = "/html/body/div[1]/div[2]/div/div/section/div[2]/button[3]"
 	lastMonthXPath      = "/html/body/div[1]/div[2]/div/div/section/div[2]/button[1]"
 	cookiePrimSleep     = 10 * time.Second
 	postClickSleep      = 5 * time.Second
@@ -77,6 +78,15 @@ func Fetch(ctx context.Context, opts FetchOptions) error {
 	logger.Info("waiting for authenticated CF page", "duration", postClickSleep)
 	if err := opts.Session.Wait(ctx, postClickSleep); err != nil {
 		return fmt.Errorf("wait after re-goto cf: %w", err)
+	}
+
+	logger.Info("clicking this month button")
+	if err := opts.Session.ClickByXPath(ctx, thisMonthXPath); err != nil {
+		return fmt.Errorf("click this month: %w", err)
+	}
+	logger.Info("waiting after this month click", "duration", postClickSleep)
+	if err := opts.Session.Wait(ctx, postClickSleep); err != nil {
+		return fmt.Errorf("wait after this month click: %w", err)
 	}
 
 	logger.Info("extracting current month HTML")
