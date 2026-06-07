@@ -9,5 +9,5 @@ services:
       TZ: Asia/Tokyo
       MF_OUTPUT_DIR: /data/out
     volumes:
-      - ./deployment:/data
+      - .:/data
     command: ["moneyforward", "--fetch"]
