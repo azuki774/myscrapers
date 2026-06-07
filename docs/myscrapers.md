@@ -19,6 +19,20 @@ Exactly **one** of `--fetch` or `--update` is required.
 | `--fetch` | Scrape the current-month CF table, last-month CF table, and asset-history page. Write three CSV files (`cf.csv`, `cf_lastmonth.csv`, `asset_history.csv`) and convert them to Shift-JIS. |
 | `--update` | Press the "一括更新" (bulk update) button on the accounts page, then click the モバイルSuica "更新" link on the home page. |
 
+### `fetch-cookie` subcommand
+
+```
+myscraper moneyforward fetch-cookie [--cookie-path PATH]
+```
+
+Downloads `cookie.json` from S3 (`<BUCKET_DIR>/cookie.json`) and writes it to the local cookie path. Use this to refresh cookies that were uploaded to S3 from a browser extension.
+
+| Flag | Default | Env fallback | Description |
+|------|---------|--------------|-------------|
+| `--cookie-path` | `/data/cookie.json` | `MF_COOKIE_PATH` | Destination path for the downloaded cookie file |
+
+Requires the same `BUCKET_*` and `AWS_*` environment variables as `--s3-upload`.
+
 ## Flags (args)
 
 | Flag | Default | Env fallback | Description |
@@ -32,7 +46,7 @@ Exactly **one** of `--fetch` or `--update` is required.
 
 ### `--s3-upload` in detail
 
-When `--s3-upload` is passed together with `--fetch`, the binary builds an `S3Uploader` after writing the CSVs and uploads each file to S3.
+When `--s3-upload` is passed together with `--fetch`, the binary builds an `S3Store` after writing the CSVs and uploads each file to S3.
 
 **Required environment variables:**
 
@@ -81,12 +95,12 @@ In production, mount a PersistentVolume or hostPath at `/data` so cookies persis
 | `MF_OUTPUT_DIR` | CLI | Output directory (default `/data`) |
 | `TZ` | Runtime | Timezone; set to `Asia/Tokyo` in the image |
 | `PLAYWRIGHT_DRIVER_PATH` | Playwright | Where to cache the Playwright browser driver |
-| `BUCKET_URL` | `--s3-upload` | S3 endpoint URL |
-| `BUCKET_NAME` | `--s3-upload` | S3 bucket name |
-| `BUCKET_DIR` | `--s3-upload` | S3 object-key prefix |
-| `AWS_REGION` | `--s3-upload` | AWS region |
-| `AWS_ACCESS_KEY_ID` | `--s3-upload` | AWS access key |
-| `AWS_SECRET_ACCESS_KEY` | `--s3-upload` | AWS secret key |
+| `BUCKET_URL` | `--s3-upload`, `fetch-cookie` | S3 endpoint URL |
+| `BUCKET_NAME` | `--s3-upload`, `fetch-cookie` | S3 bucket name |
+| `BUCKET_DIR` | `--s3-upload`, `fetch-cookie` | S3 object-key prefix |
+| `AWS_REGION` | `--s3-upload`, `fetch-cookie` | AWS region |
+| `AWS_ACCESS_KEY_ID` | `--s3-upload`, `fetch-cookie` | AWS access key |
+| `AWS_SECRET_ACCESS_KEY` | `--s3-upload`, `fetch-cookie` | AWS secret key |
 
 ## Kubernetes workload
 
