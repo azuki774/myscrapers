@@ -13,12 +13,13 @@ Use this file as the default instruction set for AI agents working in this repo.
 ## Tooling
 
 - Prefer running repository tools through Nix so commands use the expected versions and environment.
-- Use `nix develop -c <command>` for one-off commands, or enter `nix develop` before running multiple repo tools.
+- The repo's `.envrc` is `use flake`, so `direnv allow` once per checkout (or per worktree) activates the same `nix develop` shell that `nix develop -c` would. After that, run repo tools directly (e.g. `go test -v ./...`, `gopls`, `playwright install chromium`) without prefixing every command with `nix develop -c`.
+- `nix develop -c <command>` is still acceptable for one-off invocations from outside a direnv-activated shell, but in-session work should rely on the active shell.
 
 ## Go Changes
 
 - If you modify Go code, run a self-test with a `go test` command before finishing the task.
-- For the current Go scaffold, run tests from `myscraper`, typically with `nix develop -c go test ./...`.
+- For the current Go scaffold, run tests from `myscraper` with `go test -v ./...`. The active direnv shell supplies the Go toolchain pinned in `flake.nix`.
 
 ## Pull Requests
 
