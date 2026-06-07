@@ -63,13 +63,23 @@ func TestFetchProducesCSVFilesAndCallsExpectedSequence(t *testing.T) {
 	if len(sess.gotCookies) != 1 || sess.gotCookies[0].Name != "sid" {
 		t.Fatalf("AddCookies payload = %+v", sess.gotCookies)
 	}
-	wantWaits := []time.Duration{cookiePrimSleep, postClickSleep, postClickSleep, postClickSleep, postClickSleep}
+	wantWaits := []time.Duration{cookiePrimSleep, postClickSleep, postClickSleep, postClickSleep, postClickSleep, postClickSleep}
 	if len(sess.waited) != len(wantWaits) {
 		t.Fatalf("Wait calls = %v, want %v", sess.waited, wantWaits)
 	}
 	for i := range wantWaits {
 		if sess.waited[i] != wantWaits[i] {
 			t.Fatalf("Wait[%d] = %v, want %v; all waits = %v", i, sess.waited[i], wantWaits[i], sess.waited)
+		}
+	}
+
+	wantClicks := []string{"xpath:" + thisMonthXPath, "xpath:" + lastMonthXPath}
+	if len(sess.clicks) != len(wantClicks) {
+		t.Fatalf("ClickByXPath calls = %v, want %v", sess.clicks, wantClicks)
+	}
+	for i := range wantClicks {
+		if sess.clicks[i] != wantClicks[i] {
+			t.Fatalf("Click[%d] = %v, want %v; all clicks = %v", i, sess.clicks[i], wantClicks[i], sess.clicks)
 		}
 	}
 
