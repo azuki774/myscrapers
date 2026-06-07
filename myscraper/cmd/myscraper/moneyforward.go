@@ -26,7 +26,7 @@ func (r moneyforwardRunner) RunFetch(ctx context.Context, opts moneyforward.Fetc
 	opts.Session = sess
 	if s3Upload {
 		r.logger.Info("creating S3 uploader")
-		upl, err := moneyforward.NewS3Uploader(ctx)
+		upl, err := moneyforward.NewS3Store(ctx)
 		if err != nil {
 			return fmt.Errorf("build uploader: %w", err)
 		}
