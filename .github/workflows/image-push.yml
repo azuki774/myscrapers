@@ -11,7 +11,7 @@ jobs:
   build_and_push_mf:
     runs-on: ubuntu-latest
     env:
-      IMAGE_NAME: myscrapers-mf
+      IMAGE_NAME: myscrapers
     steps:
       - name: checkout
         uses: actions/checkout@v4
@@ -22,7 +22,7 @@ jobs:
         with:
           # list of Docker images to use as base name for tags
           images: |
-            ghcr.io/azuki774/myscrapers-mf
+            ghcr.io/azuki774/myscrapers
           # generate Docker tags based on the following events/attributes
           tags: |
             type=semver,pattern={{version}}

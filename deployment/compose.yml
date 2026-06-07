@@ -1,10 +1,10 @@
 services:
-  myscrapers-mf:
+  myscrapers:
     build:
       context: ..
       dockerfile: build/moneyforward/Dockerfile
-    image: myscrapers-mf:latest
-    container_name: myscrapers-mf
+    image: myscrapers:latest
+    container_name: myscrapers
     environment:
       TZ: Asia/Tokyo
       MF_OUTPUT_DIR: /data/out
