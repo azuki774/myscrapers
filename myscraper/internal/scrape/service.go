@@ -8,6 +8,8 @@ package scrape
 import (
 	"context"
 	"fmt"
+	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 )
@@ -51,6 +53,7 @@ type Result struct {
 // any Browser implementation.
 type Service struct {
 	Browser Browser
+	Logger  *slog.Logger
 }
 
 // Run executes a Request. It returns an error if no Browser has been
@@ -63,19 +66,26 @@ func (s Service) Run(ctx context.Context, req Request) (Result, error) {
 		return Result{}, fmt.Errorf("browser is required")
 	}
 
+	logger := s.Logger
+	if logger == nil {
+		logger = slog.New(slog.NewJSONHandler(io.Discard, nil))
+	}
+
+	logger.Info("fetching page", "url", req.URL, "headless", req.Headless)
 	snapshot, err := s.Browser.Fetch(ctx, req.URL, req.Headless)
 	if err != nil {
 		return Result{}, err
 	}
+	logger.Info("page fetched", "title", snapshot.Title, "url", snapshot.URL)
 
-	// Create the parent directory before WriteFile so callers can pass
-	// paths under not-yet-existing tmp/-style directories.
 	if err := os.MkdirAll(filepath.Dir(req.OutputPath), 0o755); err != nil {
 		return Result{}, err
 	}
+	logger.Info("writing HTML to file", "path", req.OutputPath)
 	if err := os.WriteFile(req.OutputPath, []byte(snapshot.HTML), 0o644); err != nil {
 		return Result{}, err
 	}
+	logger.Info("HTML written", "path", req.OutputPath)
 
 	return Result{
 		Title:      snapshot.Title,

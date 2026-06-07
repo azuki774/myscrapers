@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -54,43 +53,43 @@ func RunMoneyforward(
 		return 2
 	}
 	if (fetch && update) || (!fetch && !update) {
-		fmt.Fprintln(stderr, "exactly one of --fetch or --update is required")
+		logger.Error("exactly one of --fetch or --update is required")
 		return 2
 	}
 	cookies, err := moneyforward.LoadCookies(cookieP)
 	if err != nil {
-		fmt.Fprintf(stderr, "load cookies: %v\n", err)
+		logger.Error("failed to load cookies", "error", err, "path", cookieP)
 		return 1
 	}
 	if fetch {
 		opts := moneyforward.FetchOptions{
-			Session:   nil, // runner opens the session
+			Session:   nil,
 			Cookies:   cookies,
 			OutputDir: outDir,
 			Now:       time.Now(),
 			Logger:    logger,
 		}
 		if err := runner.RunFetch(context.Background(), opts, s3Upload); err != nil {
-			fmt.Fprintf(stderr, "fetch: %v\n", err)
+			logger.Error("fetch failed", "error", err)
 			return 1
 		}
-		fmt.Fprintln(stdout, "fetch complete")
+		logger.Info("fetch complete")
 		return 0
 	}
 	opts := moneyforward.UpdateOptions{
-		Session: nil, // runner opens the session
+		Session: nil,
 		Cookies: cookies,
 		Logger:  logger,
 	}
 	if s3Upload {
 		logger.Warn("--s3-upload has no effect with --update; ignoring")
 	}
-	_ = headless // currently always true; flag is plumbed for future use
+	_ = headless
 	if err := runner.RunUpdate(context.Background(), opts); err != nil {
-		fmt.Fprintf(stderr, "update: %v\n", err)
+		logger.Error("update failed", "error", err)
 		return 1
 	}
-	fmt.Fprintln(stdout, "update complete")
+	logger.Info("update complete")
 	return 0
 }
 
