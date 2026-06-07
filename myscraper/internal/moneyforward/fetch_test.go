@@ -63,6 +63,15 @@ func TestFetchProducesCSVFilesAndCallsExpectedSequence(t *testing.T) {
 	if len(sess.gotCookies) != 1 || sess.gotCookies[0].Name != "sid" {
 		t.Fatalf("AddCookies payload = %+v", sess.gotCookies)
 	}
+	wantWaits := []time.Duration{cookiePrimSleep, postClickSleep, postClickSleep, postClickSleep, postClickSleep}
+	if len(sess.waited) != len(wantWaits) {
+		t.Fatalf("Wait calls = %v, want %v", sess.waited, wantWaits)
+	}
+	for i := range wantWaits {
+		if sess.waited[i] != wantWaits[i] {
+			t.Fatalf("Wait[%d] = %v, want %v; all waits = %v", i, sess.waited[i], wantWaits[i], sess.waited)
+		}
+	}
 
 	cfData, err := os.ReadFile(filepath.Join(out, "cf.csv"))
 	if err != nil {

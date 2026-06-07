@@ -69,6 +69,9 @@ func Fetch(ctx context.Context, opts FetchOptions) error {
 	if err := opts.Session.Goto(ctx, cfURL); err != nil {
 		return fmt.Errorf("re-goto cf: %w", err)
 	}
+	if err := opts.Session.Wait(ctx, postClickSleep); err != nil {
+		return fmt.Errorf("wait after re-goto cf: %w", err)
+	}
 
 	nowHTML, err := opts.Session.Content(ctx)
 	if err != nil {
@@ -91,6 +94,9 @@ func Fetch(ctx context.Context, opts FetchOptions) error {
 	}
 	if err := opts.Session.Goto(ctx, cfURL); err != nil {
 		return fmt.Errorf("re-goto cf for last month: %w", err)
+	}
+	if err := opts.Session.Wait(ctx, postClickSleep); err != nil {
+		return fmt.Errorf("wait after re-goto cf for last month: %w", err)
 	}
 	lastHTML, err := opts.Session.Content(ctx)
 	if err != nil {
