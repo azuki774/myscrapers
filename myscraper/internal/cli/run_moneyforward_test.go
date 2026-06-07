@@ -14,10 +14,11 @@ import (
 )
 
 type fakeMoneyforwardRunner struct {
-	fetchCalls  int
-	updateCalls int
-	lastFetchS3 bool
-	err         error
+	fetchCalls      int
+	updateCalls     int
+	fetchCookieCalls int
+	lastFetchS3     bool
+	err             error
 }
 
 func (f *fakeMoneyforwardRunner) RunFetch(ctx context.Context, opts moneyforward.FetchOptions, s3Upload bool) error {
@@ -28,6 +29,11 @@ func (f *fakeMoneyforwardRunner) RunFetch(ctx context.Context, opts moneyforward
 
 func (f *fakeMoneyforwardRunner) RunUpdate(ctx context.Context, opts moneyforward.UpdateOptions) error {
 	f.updateCalls++
+	return f.err
+}
+
+func (f *fakeMoneyforwardRunner) RunFetchCookie(ctx context.Context, cookiePath string) error {
+	f.fetchCookieCalls++
 	return f.err
 }
 
@@ -45,6 +51,7 @@ func TestRunMoneyforwardRequiresExactlyOneVerb(t *testing.T) {
 		{"both verbs", []string{"moneyforward", "--fetch", "--update"}, 2},
 		{"fetch", []string{"moneyforward", "--fetch"}, 0},
 		{"update", []string{"moneyforward", "--update"}, 0},
+		{"fetch-cookie", []string{"moneyforward", "fetch-cookie"}, 0},
 	}
 	for _, tc := range cases {
 		tc := tc
@@ -111,5 +118,30 @@ func TestRunMoneyforwardWarnsOnS3UploadWithUpdate(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "--s3-upload") {
 		t.Fatalf("stderr = %q, want a warning mentioning --s3-upload", stderr.String())
+	}
+}
+
+func TestRunMoneyforwardFetchCookie(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	r := &fakeMoneyforwardRunner{}
+
+	code := RunMoneyforward([]string{"moneyforward", "fetch-cookie"}, stdout, stderr, slog.New(slog.NewTextHandler(stderr, nil)), r)
+	if code != 0 {
+		t.Fatalf("exit = %d, want 0; stderr = %q", code, stderr.String())
+	}
+	if r.fetchCookieCalls != 1 {
+		t.Fatalf("fetchCookieCalls = %d, want 1", r.fetchCookieCalls)
+	}
+}
+
+func TestRunMoneyforwardFetchCookiePropagatesError(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	r := &fakeMoneyforwardRunner{err: errors.New("s3 fail")}
+
+	code := RunMoneyforward([]string{"moneyforward", "fetch-cookie"}, stdout, stderr, slog.New(slog.NewTextHandler(stderr, nil)), r)
+	if code != 1 {
+		t.Fatalf("exit = %d, want 1; stderr = %q", code, stderr.String())
 	}
 }

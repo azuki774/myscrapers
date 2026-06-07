@@ -9,7 +9,7 @@ import (
 )
 
 // moneyforwardRunner is the production cli.MoneyforwardRunner: it opens
-// a Playwright-backed Session, optionally builds an S3Uploader, and
+// a Playwright-backed Session, optionally builds an S3Store, and
 // delegates to moneyforward.Fetch / moneyforward.Update.
 type moneyforwardRunner struct {
 	logger   *slog.Logger
@@ -47,4 +47,8 @@ func (r moneyforwardRunner) RunUpdate(ctx context.Context, opts moneyforward.Upd
 	opts.Session = sess
 	r.logger.Info("starting update")
 	return moneyforward.Update(ctx, opts)
+}
+
+func (r moneyforwardRunner) RunFetchCookie(ctx context.Context, cookiePath string) error {
+	return fmt.Errorf("fetch-cookie not yet implemented")
 }
