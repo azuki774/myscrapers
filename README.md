@@ -27,7 +27,7 @@ SBIのポートフォリオを保存する Python ベースの scraper。
 - s3ストレージにアップロードへの機能がある。
     - 環境変数 `BUCKET_NAME`があった場合、取得したデータを `s3://${BUCKET_NAME}/${REMOTE_DIR}/YYYYMM/YYYYMMDD/` に保存。
 
-## myscrapers-mf (Go)
+## myscrapers (Go)
 
 マネーフォワードの家計簿パートを保存する Go ベースの scraper。
 実装は `myscraper/` 配下にある。
@@ -39,7 +39,7 @@ Python 版の実装は `src/moneyforward/` に残している（legacy 扱い）
     - 今月分と先月分のCSVファイル、および資産推移を出力
 - s3ストレージにアップロードへの機能がある。
     - 環境変数 `BUCKET_*` と `AWS_*` を設定することで、S3にアップロードする。
-- 詳細な使い方は `docs/myscrapers-mf.md` を参照。
+- 詳細な使い方は `docs/myscrapers.md` を参照。
 
 ```bash
 nix develop
@@ -61,7 +61,7 @@ myscraper moneyforward --update
 myscraper moneyforward --fetch --output-dir ./out --cookie-path ./cookie.json
 ```
 
-### myscraper-mf local with podman compose
+### myscraper local with podman compose
 
 `deployment/compose.yml` is stored inside `deployment/`, so it mounts `.`
 (the compose file directory itself) to `/data`. That keeps the cookie at
@@ -76,11 +76,11 @@ does not get committed by accident.
 mkdir -p deployment/out
 cp /path/to/browser-exported-cookie.json deployment/cookie.json
 podman compose -f deployment/compose.yml build
-podman compose -f deployment/compose.yml run --rm myscrapers-mf
+podman compose -f deployment/compose.yml run --rm myscrapers
 # first run may download the Playwright driver into deployment/.playwright-driver
 
 # run update instead of fetch
-podman compose -f deployment/compose.yml run --rm myscrapers-mf \
+podman compose -f deployment/compose.yml run --rm myscrapers \
   moneyforward --update
 ```
 

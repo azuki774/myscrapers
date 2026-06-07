@@ -1,7 +1,7 @@
 SHELL=/bin/bash
 VERSION=latest
 container_name_sbi=myscrapers-sbi
-container_name_mf=myscrapers-mf
+container_name_mf=myscrapers
 
 .PHONY: build start stop debug
 

@@ -1,6 +1,6 @@
-# myscrapers-mf (Go) — Usage Guide
+# myscrapers (Go) — Usage Guide
 
-myscrapers-mf is a containerised Go CLI that scrapes MoneyForward household-accounting pages and either writes CSV files locally or uploads them to S3. It replaces the legacy Python scraper under `src/moneyforward/`.
+myscrapers is a containerised Go CLI that scrapes MoneyForward household-accounting pages and either writes CSV files locally or uploads them to S3. It replaces the legacy Python scraper under `src/moneyforward/`.
 
 ## Binary
 
@@ -90,7 +90,7 @@ In production, mount a PersistentVolume or hostPath at `/data` so cookies persis
 
 ## Kubernetes workload
 
-myscrapers-mf is designed to run as a **Kubernetes CronJob** that executes on a schedule (e.g. daily). Below is a reference manifest.
+myscrapers is designed to run as a **Kubernetes CronJob** that executes on a schedule (e.g. daily). Below is a reference manifest.
 
 ### CronJob example
 
@@ -98,7 +98,7 @@ myscrapers-mf is designed to run as a **Kubernetes CronJob** that executes on a 
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: myscrapers-mf-fetch
+  name: myscrapers-fetch
   namespace: myscrapers
 spec:
   schedule: "0 3 * * *"            # every day at 03:00
@@ -112,8 +112,8 @@ spec:
         spec:
           restartPolicy: OnFailure
           containers:
-            - name: myscrapers-mf
-              image: ghcr.io/azuki774/myscrapers-mf:latest
+            - name: myscrapers
+              image: ghcr.io/azuki774/myscrapers:latest
               args: ["moneyforward", "--fetch", "--s3-upload"]
               env:
                 - name: TZ
@@ -158,7 +158,7 @@ spec:
           volumes:
             - name: data
               persistentVolumeClaim:
-                claimName: myscrapers-mf-data
+                claimName: myscrapers-data
 ```
 
 ### Separate CronJob for `--update`
@@ -167,7 +167,7 @@ spec:
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: myscrapers-mf-update
+  name: myscrapers-update
   namespace: myscrapers
 spec:
   schedule: "0 6 * * *"            # every day at 06:00
@@ -179,8 +179,8 @@ spec:
         spec:
           restartPolicy: OnFailure
           containers:
-            - name: myscrapers-mf
-              image: ghcr.io/azuki774/myscrapers-mf:latest
+            - name: myscrapers
+              image: ghcr.io/azuki774/myscrapers:latest
               args: ["moneyforward", "--update"]
               env:
                 - name: TZ
@@ -193,7 +193,7 @@ spec:
           volumes:
             - name: data
               persistentVolumeClaim:
-                claimName: myscrapers-mf-data
+                claimName: myscrapers-data
 ```
 
 ### Key points for Kubernetes
@@ -216,14 +216,14 @@ docker run --rm \
   -e AWS_REGION=ap-northeast-1 \
   -e AWS_ACCESS_KEY_ID=xxx \
   -e AWS_SECRET_ACCESS_KEY=xxx \
-  myscrapers-mf
+  myscrapers
 
 # Docker: fetch without S3 upload
-docker run --rm -v ./data:/data myscrapers-mf \
+docker run --rm -v ./data:/data myscrapers \
   myscraper moneyforward --fetch
 
 # Docker: update (press bulk-update + Suica)
-docker run --rm -v ./data:/data myscrapers-mf \
+docker run --rm -v ./data:/data myscrapers \
   myscraper moneyforward --update
 
 # Kubernetes: see CronJob manifests above
