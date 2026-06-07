@@ -50,5 +50,15 @@ func (r moneyforwardRunner) RunUpdate(ctx context.Context, opts moneyforward.Upd
 }
 
 func (r moneyforwardRunner) RunFetchCookie(ctx context.Context, cookiePath string) error {
-	return fmt.Errorf("fetch-cookie not yet implemented")
+	r.logger.Info("creating S3 store for cookie download")
+	store, err := moneyforward.NewS3Store(ctx)
+	if err != nil {
+		return fmt.Errorf("build s3 store: %w", err)
+	}
+	r.logger.Info("downloading cookie.json from S3")
+	if err := store.Download(ctx, "cookie.json", cookiePath); err != nil {
+		return fmt.Errorf("download cookie: %w", err)
+	}
+	r.logger.Info("cookie downloaded", "path", cookiePath)
+	return nil
 }
