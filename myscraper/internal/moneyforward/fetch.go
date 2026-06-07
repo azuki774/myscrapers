@@ -39,10 +39,9 @@ type FetchOptions struct {
 
 // Fetch orchestrates the "moneyforward --fetch" subcommand: prime the
 // cookie domain, inject cookies, scrape CF (this month + last month) and
-// the asset history page, write the three CSVs, convert them in place to
-// Shift-JIS, and (if Uploader is set in the wrapper) upload them. The
-// returned error wraps the first failure; on success Session.Close is
-// always called.
+// the asset history page, write the three CSVs, and (if Uploader is set
+// in the wrapper) upload them. The returned error wraps the first failure;
+// on success Session.Close is always called.
 func Fetch(ctx context.Context, opts FetchOptions) error {
 	if opts.Session == nil {
 		return fmt.Errorf("session is required")
@@ -157,13 +156,6 @@ func Fetch(ctx context.Context, opts FetchOptions) error {
 	}
 	logger.Info("fetched asset history", "rows", len(assetRows))
 
-	logger.Info("converting CSV files to Shift-JIS", "files", []string{cfFilename, cfLastFilename, assetFilename})
-	for _, name := range []string{cfFilename, cfLastFilename, assetFilename} {
-		if err := UTF8ToSJIS(filepath.Join(opts.OutputDir, name)); err != nil {
-			return fmt.Errorf("convert %s: %w", name, err)
-		}
-	}
-	logger.Info("Shift-JIS conversion complete")
 	if opts.Uploader != nil {
 		for _, name := range []string{cfFilename, cfLastFilename, assetFilename} {
 			path := filepath.Join(opts.OutputDir, name)

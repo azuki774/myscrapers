@@ -9,7 +9,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.103.2
 	github.com/playwright-community/playwright-go v0.5200.1
 	golang.org/x/net v0.55.0
-	golang.org/x/text v0.37.0
 )
 
 require (
