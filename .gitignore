@@ -45,3 +45,6 @@ myscraper/myscraper
 go/myscraper/.playwright/
 go/myscraper/tmp/
 go/myscraper/myscraper
+
+# Local git worktrees
+.worktrees/
