@@ -8,6 +8,7 @@ services:
     environment:
       TZ: Asia/Tokyo
       MF_OUTPUT_DIR: /data/out
+      PLAYWRIGHT_DRIVER_PATH: /data/.playwright-driver
     volumes:
       - .:/data
     command: ["moneyforward", "--fetch"]

@@ -5,8 +5,16 @@ import (
 	"fmt"
 	"time"
 
+	browserpkg "github.com/azuki774/myscrapers/myscraper/internal/browser"
 	"github.com/azuki774/myscrapers/myscraper/internal/chromium"
 	"github.com/playwright-community/playwright-go"
+)
+
+var (
+	defaultInstallPlaywrightDriver = browserpkg.InstallDriver
+	installPlaywrightDriver        = defaultInstallPlaywrightDriver
+	defaultRunPlaywright           = playwright.Run
+	runPlaywright                  = defaultRunPlaywright
 )
 
 // Compile-time check that PlaywrightSession satisfies Session.
@@ -27,7 +35,10 @@ type PlaywrightSession struct {
 // in the Docker image), opens a fresh BrowserContext, and returns a
 // Session ready for the orchestrators to drive.
 func NewPlaywrightSession(ctx context.Context, headless bool) (*PlaywrightSession, error) {
-	pw, err := playwright.Run()
+	if err := installPlaywrightDriver(); err != nil {
+		return nil, fmt.Errorf("install playwright driver: %w", err)
+	}
+	pw, err := runPlaywright()
 	if err != nil {
 		return nil, fmt.Errorf("start playwright: %w", err)
 	}
