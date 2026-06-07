@@ -29,6 +29,7 @@ func main() {
 		os.Args[1:],
 		os.Stdout,
 		os.Stderr,
-		scrape.Service{Browser: browser.PlaywrightBrowser{}},
+		logger,
+		scrape.Service{Browser: browser.PlaywrightBrowser{}, Logger: logger},
 	))
 }
