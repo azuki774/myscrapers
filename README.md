@@ -76,3 +76,30 @@ myscraper moneyforward --update
 # override defaults
 myscraper moneyforward --fetch --output-dir ./out --cookie-path ./cookie.json
 ```
+
+### myscraper-mf local with podman compose
+
+`deployment/compose.yml` is stored inside `deployment/`, so it mounts `.`
+(the compose file directory itself) to `/data`. That keeps the cookie at
+`deployment/cookie.json` while still letting the scraper read
+`/data/cookie.json`, `MF_OUTPUT_DIR=/data/out` keeps scrape output under
+`deployment/out/`, and `PLAYWRIGHT_DRIVER_PATH=/data/.playwright-driver`
+persists the Playwright driver across local runs.
+`deployment/cookie.json` is ignored by Git so the browser-exported cookie file
+does not get committed by accident.
+
+```bash
+mkdir -p deployment/out
+cp /path/to/browser-exported-cookie.json deployment/cookie.json
+podman compose -f deployment/compose.yml build
+podman compose -f deployment/compose.yml run --rm myscrapers-mf
+# first run may download the Playwright driver into deployment/.playwright-driver
+
+# run update instead of fetch
+podman compose -f deployment/compose.yml run --rm myscrapers-mf \
+  moneyforward --update
+```
+
+If an older compose setup created `deployment/deployment/` or turned
+`deployment/cookie.json` into a directory, remove those leftovers before
+running the container again.

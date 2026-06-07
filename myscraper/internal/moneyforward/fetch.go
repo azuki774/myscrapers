@@ -12,14 +12,16 @@ import (
 )
 
 const (
-	cfURL           = "https://moneyforward.com/cf"
-	bsHistoryURL    = "https://moneyforward.com/bs/history"
-	cfFilename      = "cf.csv"
-	cfLastFilename  = "cf_lastmonth.csv"
-	assetFilename   = "asset_history.csv"
-	lastMonthXPath  = "/html/body/div[1]/div[2]/div/div/section/div[2]/button[1]"
-	cookiePrimSleep = 10 * time.Second
-	postClickSleep  = 5 * time.Second
+	cfURL               = "https://moneyforward.com/cf"
+	bsHistoryURL        = "https://moneyforward.com/bs/history"
+	cfFilename          = "cf.csv"
+	cfLastFilename      = "cf_lastmonth.csv"
+	assetFilename       = "asset_history.csv"
+	cfNowDebugFilename  = "cf_now_debug.html"
+	cfLastDebugFilename = "cf_lastmonth_debug.html"
+	lastMonthXPath      = "/html/body/div[1]/div[2]/div/div/section/div[2]/button[1]"
+	cookiePrimSleep     = 10 * time.Second
+	postClickSleep      = 5 * time.Second
 )
 
 // FetchOptions collects the inputs the Fetch orchestrator needs from the
@@ -69,6 +71,9 @@ func Fetch(ctx context.Context, opts FetchOptions) error {
 	if err := opts.Session.Goto(ctx, cfURL); err != nil {
 		return fmt.Errorf("re-goto cf: %w", err)
 	}
+	if err := opts.Session.Wait(ctx, postClickSleep); err != nil {
+		return fmt.Errorf("wait after re-goto cf: %w", err)
+	}
 
 	nowHTML, err := opts.Session.Content(ctx)
 	if err != nil {
@@ -76,7 +81,11 @@ func Fetch(ctx context.Context, opts FetchOptions) error {
 	}
 	nowRows, err := ExtractCFTable(nowHTML)
 	if err != nil {
-		return fmt.Errorf("parse cf now: %w", err)
+		debugPath, dumpErr := writeDebugHTML(opts.OutputDir, cfNowDebugFilename, nowHTML)
+		if dumpErr != nil {
+			return fmt.Errorf("parse cf now: %w; also failed to write debug html: %v", err, dumpErr)
+		}
+		return fmt.Errorf("parse cf now: %w; debug html: %s", err, debugPath)
 	}
 	if err := writeCF(opts, nowRows, false); err != nil {
 		return err
@@ -92,13 +101,20 @@ func Fetch(ctx context.Context, opts FetchOptions) error {
 	if err := opts.Session.Goto(ctx, cfURL); err != nil {
 		return fmt.Errorf("re-goto cf for last month: %w", err)
 	}
+	if err := opts.Session.Wait(ctx, postClickSleep); err != nil {
+		return fmt.Errorf("wait after re-goto cf for last month: %w", err)
+	}
 	lastHTML, err := opts.Session.Content(ctx)
 	if err != nil {
 		return fmt.Errorf("read cf lastmonth: %w", err)
 	}
 	lastRows, err := ExtractCFTable(lastHTML)
 	if err != nil {
-		return fmt.Errorf("parse cf lastmonth: %w", err)
+		debugPath, dumpErr := writeDebugHTML(opts.OutputDir, cfLastDebugFilename, lastHTML)
+		if dumpErr != nil {
+			return fmt.Errorf("parse cf lastmonth: %w; also failed to write debug html: %v", err, dumpErr)
+		}
+		return fmt.Errorf("parse cf lastmonth: %w; debug html: %s", err, debugPath)
 	}
 	if err := writeCF(opts, lastRows, true); err != nil {
 		return err
@@ -169,4 +185,12 @@ func writeAssetHistory(dir string, rows [][]string) error {
 	}
 	w.Flush()
 	return w.Error()
+}
+
+func writeDebugHTML(dir, name, body string) (string, error) {
+	path := filepath.Join(dir, name)
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		return path, fmt.Errorf("write %s: %w", path, err)
+	}
+	return path, nil
 }

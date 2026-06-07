@@ -1,10 +1,14 @@
 services:
-  myscrapers-mf-test:
+  myscrapers-mf:
+    build:
+      context: ..
+      dockerfile: build/moneyforward/Dockerfile
     image: myscrapers-mf:latest
     container_name: myscrapers-mf
     environment:
-      - TZ="JST-9"
+      TZ: Asia/Tokyo
+      MF_OUTPUT_DIR: /data/out
+      PLAYWRIGHT_DRIVER_PATH: /data/.playwright-driver
     volumes:
-      # /data/cookie.json
-      - ./browser/:/data/
-    command: [ "moneyforward", "--fetch", "--s3-upload" ]
+      - .:/data
+    command: ["moneyforward", "--fetch"]

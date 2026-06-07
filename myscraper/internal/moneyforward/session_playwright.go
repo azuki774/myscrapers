@@ -5,8 +5,18 @@ import (
 	"fmt"
 	"time"
 
+	browserpkg "github.com/azuki774/myscrapers/myscraper/internal/browser"
 	"github.com/azuki774/myscrapers/myscraper/internal/chromium"
 	"github.com/playwright-community/playwright-go"
+)
+
+const moneyforwardUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36"
+
+var (
+	defaultInstallPlaywrightDriver = browserpkg.InstallDriver
+	installPlaywrightDriver        = defaultInstallPlaywrightDriver
+	defaultRunPlaywright           = playwright.Run
+	runPlaywright                  = defaultRunPlaywright
 )
 
 // Compile-time check that PlaywrightSession satisfies Session.
@@ -26,8 +36,31 @@ type PlaywrightSession struct {
 // driven by the system browser (chromium in the dev shell, google-chrome
 // in the Docker image), opens a fresh BrowserContext, and returns a
 // Session ready for the orchestrators to drive.
+func launchOptions(executablePath string, headless bool) playwright.BrowserTypeLaunchOptions {
+	return playwright.BrowserTypeLaunchOptions{
+		ExecutablePath: playwright.String(executablePath),
+		Headless:       playwright.Bool(headless),
+		Args: []string{
+			"--no-sandbox",
+			"--disable-gpu",
+			"--lang=ja-JP",
+			"--disable-dev-shm-usage",
+		},
+	}
+}
+
+func contextOptions() playwright.BrowserNewContextOptions {
+	return playwright.BrowserNewContextOptions{
+		UserAgent: playwright.String(moneyforwardUserAgent),
+		Locale:    playwright.String("ja-JP"),
+	}
+}
+
 func NewPlaywrightSession(ctx context.Context, headless bool) (*PlaywrightSession, error) {
-	pw, err := playwright.Run()
+	if err := installPlaywrightDriver(); err != nil {
+		return nil, fmt.Errorf("install playwright driver: %w", err)
+	}
+	pw, err := runPlaywright()
 	if err != nil {
 		return nil, fmt.Errorf("start playwright: %w", err)
 	}
@@ -36,15 +69,12 @@ func NewPlaywrightSession(ctx context.Context, headless bool) (*PlaywrightSessio
 		_ = pw.Stop()
 		return nil, err
 	}
-	browser, err := pw.Chromium.Launch(playwright.BrowserTypeLaunchOptions{
-		ExecutablePath: playwright.String(executablePath),
-		Headless:       playwright.Bool(headless),
-	})
+	browser, err := pw.Chromium.Launch(launchOptions(executablePath, headless))
 	if err != nil {
 		_ = pw.Stop()
 		return nil, fmt.Errorf("launch chromium: %w", err)
 	}
-	bctx, err := browser.NewContext()
+	bctx, err := browser.NewContext(contextOptions())
 	if err != nil {
 		_ = browser.Close()
 		_ = pw.Stop()
