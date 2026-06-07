@@ -12,9 +12,8 @@ import (
 )
 
 // TestMoneyforwardSmoke drives moneyforward.Fetch end-to-end through
-// the table extractors, CSV writers, and UTF-8→Shift-JIS round-trip
-// against checked-in HTML fixtures. Gated on MF_E2E=1 so the default
-// `go test ./...` stays offline.
+// the table extractors and CSV writers against checked-in HTML fixtures.
+// Gated on MF_E2E=1 so the default `go test ./...` stays offline.
 func TestMoneyforwardSmoke(t *testing.T) {
 	if os.Getenv("MF_E2E") != "1" {
 		t.Skip("set MF_E2E=1 to run moneyforward smoke test")
