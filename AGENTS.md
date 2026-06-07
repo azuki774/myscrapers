@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This repository contains both legacy Python scrapers and a new Go-based v2 scaffold.
+This repository contains a Go-based scraper (`myscraper/`) for MoneyForward and legacy Python scrapers (`src/sbi/` for SBI, `src/moneyforward/` for MoneyForward).
 Use this file as the default instruction set for AI agents working in this repo.
 
 ## Skills
