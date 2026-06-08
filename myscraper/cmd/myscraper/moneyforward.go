@@ -9,7 +9,7 @@ import (
 )
 
 // moneyforwardRunner is the production cli.MoneyforwardRunner: it opens
-// a Playwright-backed Session, optionally builds an S3Uploader, and
+// a Playwright-backed Session, optionally builds an S3Store, and
 // delegates to moneyforward.Fetch / moneyforward.Update.
 type moneyforwardRunner struct {
 	logger   *slog.Logger
@@ -26,7 +26,7 @@ func (r moneyforwardRunner) RunFetch(ctx context.Context, opts moneyforward.Fetc
 	opts.Session = sess
 	if s3Upload {
 		r.logger.Info("creating S3 uploader")
-		upl, err := moneyforward.NewS3Uploader(ctx)
+		upl, err := moneyforward.NewS3Store(ctx)
 		if err != nil {
 			return fmt.Errorf("build uploader: %w", err)
 		}
@@ -47,4 +47,18 @@ func (r moneyforwardRunner) RunUpdate(ctx context.Context, opts moneyforward.Upd
 	opts.Session = sess
 	r.logger.Info("starting update")
 	return moneyforward.Update(ctx, opts)
+}
+
+func (r moneyforwardRunner) RunFetchCookie(ctx context.Context, cookiePath string) error {
+	r.logger.Info("creating S3 store for cookie download")
+	store, err := moneyforward.NewS3Store(ctx)
+	if err != nil {
+		return fmt.Errorf("build s3 store: %w", err)
+	}
+	r.logger.Info("downloading cookie.json from S3")
+	if err := store.Download(ctx, "cookie.json", cookiePath); err != nil {
+		return fmt.Errorf("download cookie: %w", err)
+	}
+	r.logger.Info("cookie downloaded", "path", cookiePath)
+	return nil
 }

@@ -17,6 +17,7 @@ import (
 type MoneyforwardRunner interface {
 	RunFetch(ctx context.Context, opts moneyforward.FetchOptions, s3Upload bool) error
 	RunUpdate(ctx context.Context, opts moneyforward.UpdateOptions) error
+	RunFetchCookie(ctx context.Context, cookiePath string) error
 }
 
 // RunMoneyforward parses the "moneyforward" subcommand argv slice,
@@ -33,6 +34,20 @@ func RunMoneyforward(
 	logger *slog.Logger,
 	runner MoneyforwardRunner,
 ) int {
+	if len(args) > 1 && args[1] == "fetch-cookie" {
+		fs := newFlagSet(stderr)
+		cookieP := fs.String("cookie-path", envOr("MF_COOKIE_PATH", "/data/cookie.json"), "cookie JSON destination path")
+		if err := fs.Parse(args[2:]); err != nil {
+			return 2
+		}
+		if err := runner.RunFetchCookie(context.Background(), *cookieP); err != nil {
+			logger.Error("fetch-cookie failed", "error", err)
+			return 1
+		}
+		logger.Info("fetch-cookie complete", "path", *cookieP)
+		return 0
+	}
+
 	fs := newFlagSet(stderr)
 	var (
 		fetch    bool

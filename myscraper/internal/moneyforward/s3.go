@@ -3,6 +3,7 @@ package moneyforward
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -12,39 +13,24 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
-// Uploader is the minimum interface the Fetch orchestrator needs to
-// ship a CSV file off-host. The production implementation is
-// S3Uploader; tests use a fake that records the keys it was asked to
-// upload.
 type Uploader interface {
 	Upload(ctx context.Context, localPath string) error
 }
 
-// s3PutObjectClient is the subset of *s3.Client that S3Uploader needs.
-// The concrete *s3.Client from aws-sdk-go-v2 satisfies it via Go's
-// structural typing, and tests inject a fake to assert on the
-// PutObjectInput without contacting AWS.
 type s3PutObjectClient interface {
 	PutObject(ctx context.Context, input *s3.PutObjectInput, opts ...func(*s3.Options)) (*s3.PutObjectOutput, error)
 }
 
-// S3Uploader uploads each local file to "<prefix>/<basename>" on the
-// configured bucket via the supplied S3 client. The bucket and prefix
-// are captured at construction time so the Fetch orchestrator only
-// needs to know about Uploader.
-type S3Uploader struct {
-	client s3PutObjectClient
-	bucket string
-	prefix string
+type s3GetObjectClient interface {
+	GetObject(ctx context.Context, input *s3.GetObjectInput, opts ...func(*s3.Options)) (*s3.GetObjectOutput, error)
 }
 
-// NewS3Uploader reads the AWS_* and BUCKET_* environment variables and
-// returns an S3Uploader ready to upload to the configured endpoint.
-// Required env vars: BUCKET_URL, BUCKET_NAME, BUCKET_DIR,
-// AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION. The returned
-// error names the first missing variable so callers can fix env
-// configuration without trial and error.
-func NewS3Uploader(ctx context.Context) (*S3Uploader, error) {
+type s3ReadWriteClient interface {
+	s3PutObjectClient
+	s3GetObjectClient
+}
+
+func newS3ClientFromEnv(ctx context.Context) (*s3.Client, string, string, error) {
 	required := []struct {
 		name string
 		val  string
@@ -58,7 +44,7 @@ func NewS3Uploader(ctx context.Context) (*S3Uploader, error) {
 	}
 	for _, r := range required {
 		if r.val == "" {
-			return nil, fmt.Errorf("S3Uploader: %s is required", r.name)
+			return nil, "", "", fmt.Errorf("S3Store: %s is required", r.name)
 		}
 	}
 	endpoint := required[0].val
@@ -72,38 +58,71 @@ func NewS3Uploader(ctx context.Context) (*S3Uploader, error) {
 		awscfg.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(accessKey, secretKey, "")),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("load aws config: %w", err)
+		return nil, "", "", fmt.Errorf("load aws config: %w", err)
 	}
 	client := s3.NewFromConfig(cfg, func(o *s3.Options) {
 		o.BaseEndpoint = awsv2.String(endpoint)
 		o.UsePathStyle = true
 	})
-	return &S3Uploader{client: client, bucket: bucket, prefix: prefix}, nil
+	return client, bucket, prefix, nil
 }
 
-// KeyFor returns the S3 object key for a local file path. The key is
-// "<prefix>/<basename>" so callers know the upload destination without
-// reading the file. The base name is computed with filepath.Base which
-// strips any directory component.
-func (u *S3Uploader) KeyFor(localPath string) string {
-	return u.prefix + "/" + filepath.Base(localPath)
+type S3Store struct {
+	client s3ReadWriteClient
+	bucket string
+	prefix string
 }
 
-// Upload sends a single file to "<prefix>/<basename>" on the bucket.
-func (u *S3Uploader) Upload(ctx context.Context, localPath string) error {
-	key := u.KeyFor(localPath)
+func NewS3Store(ctx context.Context) (*S3Store, error) {
+	client, bucket, prefix, err := newS3ClientFromEnv(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &S3Store{client: client, bucket: bucket, prefix: prefix}, nil
+}
+
+func (s *S3Store) KeyFor(localPath string) string {
+	return s.prefix + "/" + filepath.Base(localPath)
+}
+
+func (s *S3Store) Upload(ctx context.Context, localPath string) error {
+	key := s.KeyFor(localPath)
 	f, err := os.Open(localPath)
 	if err != nil {
 		return fmt.Errorf("open %s: %w", localPath, err)
 	}
 	defer f.Close()
-	_, err = u.client.PutObject(ctx, &s3.PutObjectInput{
-		Bucket: awsv2.String(u.bucket),
+	_, err = s.client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket: awsv2.String(s.bucket),
 		Key:    awsv2.String(key),
 		Body:   f,
 	})
 	if err != nil {
 		return fmt.Errorf("put %s: %w", key, err)
+	}
+	return nil
+}
+
+func (s *S3Store) Download(ctx context.Context, key, destPath string) error {
+	fullKey := s.prefix + "/" + key
+	out, err := s.client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: awsv2.String(s.bucket),
+		Key:    awsv2.String(fullKey),
+	})
+	if err != nil {
+		return fmt.Errorf("get %s: %w", fullKey, err)
+	}
+	defer out.Body.Close()
+	f, err := os.Create(destPath)
+	if err != nil {
+		return fmt.Errorf("create %s: %w", destPath, err)
+	}
+	if _, err := io.Copy(f, out.Body); err != nil {
+		f.Close()
+		return fmt.Errorf("write %s: %w", destPath, err)
+	}
+	if err := f.Close(); err != nil {
+		return fmt.Errorf("close %s: %w", destPath, err)
 	}
 	return nil
 }
