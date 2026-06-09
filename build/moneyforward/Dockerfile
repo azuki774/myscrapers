@@ -56,6 +56,7 @@ RUN apt-get update && \
 
 ENV PLAYWRIGHT_DRIVER_PATH=/playwright/.driver
 COPY --from=builder /out/playwright-driver ${PLAYWRIGHT_DRIVER_PATH}
+RUN chmod +x ${PLAYWRIGHT_DRIVER_PATH}/node
 
 RUN useradd --system --uid 10001 --create-home --home-dir /home/myscraper myscraper
 WORKDIR /home/myscraper
