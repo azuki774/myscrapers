@@ -31,6 +31,12 @@ RUN CGO_ENABLED=0 \
       -ldflags=-buildid= \
       -o /out/myscraper ./cmd/myscraper
 
+# Pre-download the Playwright Node driver so the runtime image does not
+# need Go or network access to install it. The driver version must match
+# playwright-go's expectation (v1.52.0 for playwright-go v0.5200.1).
+ENV PLAYWRIGHT_DRIVER_PATH=/out/playwright-driver
+RUN go run github.com/playwright-community/playwright-go/cmd/playwright@v0.5200.1 install
+
 FROM ${RUNTIME_BASE}
 
 # Debian's `chromium` is on PATH and is the first match in
@@ -47,6 +53,9 @@ RUN apt-get update && \
       libnss3 \
       libfontconfig1 && \
     rm -rf /var/lib/apt/lists/*
+
+ENV PLAYWRIGHT_DRIVER_PATH=/playwright/.driver
+COPY --from=builder /out/playwright-driver ${PLAYWRIGHT_DRIVER_PATH}
 
 RUN useradd --system --uid 10001 --create-home --home-dir /home/myscraper myscraper
 WORKDIR /home/myscraper
