@@ -15,6 +15,80 @@ PLAYWRIGHT_E2E=1 go test ./e2e -run TestGitHubSmoke -v
 go run ./cmd/myscraper --url https://github.com --out tmp/github.html
 ```
 
+### myscraper sbi CLI
+
+SBI証券の資産サマリーを、保存済みパスキーで自動ログインして取得する。
+
+```bash
+nix develop
+cd myscraper
+go run ./cmd/myscraper sbi --passkey /home/azuki/.local/state/opencode/sbi-passkey.json
+# → JSON(domestic 口座サマリー / 外国株式 NISA 保有 / 外貨預り金 / 合計)を stdout に出力
+
+# ファイル出力
+go run ./cmd/myscraper sbi --passkey ~/.local/state/opencode/sbi-passkey.json \
+  --output ./out/assets.json
+```
+
+パスキーの指定は `--passkey` フラグが最優先で、省略時は環境変数 `SBI_PASSKEY_PATH`、それも無ければデフォルト `~/.local/state/opencode/sbi-passkey.json` を使います:
+
+```bash
+export SBI_PASSKEY_PATH=~/.local/state/opencode/sbi-passkey.json
+go run ./cmd/myscraper sbi
+```
+
+出力例(値はダミー。実際の口座の金額とは無関係)。全フィールドを含む完全な JSON は `myscraper/internal/sbi/testdata/example-assets.json` にあり、`go test` で構造・整合性(holdings の合計とクラス集計の一致、MECE 合計)が検証されます。
+
+```json
+{
+  "fetched_at": "2026-08-16T11:46:51.908856153Z",
+  "nisa": {
+    "total_jpy": 3771642,
+    "prev_day_jpy": 0,
+    "prev_day_pct": 0,
+    "prev_month_jpy": 967383,
+    "prev_month_pct": 34.49,
+    "pnl_jpy": 697759,
+    "pnl_pct": 22.69,
+    "domestic_stocks": { "value_jpy": 238635, "pnl_jpy": -2140, "pnl_pct": -0.88, "prev_day_jpy": 0, "prev_day_pct": 0, "prev_month_jpy": 10115, "prev_month_pct": 4.42,
+      "holdings": [ { "name": "日本製鉄", "quantity": 200, "unit_cost": 598, "unit_price": 674.4, "prev_day_jpy": -1.9, "prev_day_pct": -0.28, "pnl_jpy": 15280, "pnl_pct": 12.78, "value_jpy": 134880 } ] },
+    "us_stocks":       { "value_jpy": 1396796, "pnl_jpy": 235728, "pnl_pct": 20.3, "prev_day_jpy": 0, "prev_day_pct": 0, "prev_month_jpy": 791050, "prev_month_pct": 130.59,
+      "holdings": [ { "name": "アドバンスト マイクロ デバイシズ", "quantity": 5, "unit_cost": 201.05, "unit_price": 514.39, "pnl_jpy": 250529, "value_jpy": 409814 } ] },
+    "funds":           { "value_jpy": 2136211, "pnl_jpy": 464171, "pnl_pct": 27.76, "prev_day_jpy": 0, "prev_day_pct": 0, "prev_month_jpy": 166218, "prev_month_pct": 8.43,
+      "holdings": [ { "name": "ｅＭＡＸＩＳ Ｓｌｉｍ 新興国株式インデックス", "quantity": 223327, "unit_cost": 19333, "unit_price": 27337, "prev_day_jpy": 237, "prev_day_pct": 0.87, "pnl_jpy": 178750.93, "pnl_pct": 41.4, "value_jpy": 610509.01 } ] }
+  },
+  "old_nisa": {
+    "total_jpy": 1383248.56,
+    "prev_day_jpy": 7486.78,
+    "prev_day_pct": 0.54,
+    "pnl_jpy": 650638.94,
+    "pnl_pct": 88.81,
+    "funds": [
+      { "name": "ｅＭＡＸＩＳ Ｓｌｉｍ 新興国株式インデックス", "quantity": 131210, "unit_cost": 12888, "unit_price": 27337, "prev_day_jpy": 237, "prev_day_pct": 0.87, "pnl_jpy": 189585.32, "pnl_pct": 112.11, "value_jpy": 358688.77 },
+      { "name": "ひふみプラス", "quantity": 11544, "unit_cost": 47384, "unit_price": 83470, "prev_day_jpy": 359, "prev_day_pct": 0.43, "pnl_jpy": 41657.67, "pnl_pct": 76.16, "value_jpy": 96357.76 }
+    ]
+  },
+  "other": {
+    "cash_jpy": 24870,
+    "funds_jpy": 81423.47,
+    "usd_cash": { "usd": 879.3, "jpy": 140107 }
+  },
+  "grand_total_jpy": 5401291.03
+}
+```
+
+構成は MECE(重複なし・漏れなし)で、`grand_total_jpy` は以下の合計です:
+
+- `nisa`: 新NISA ポートフォリオ(国内株式 + 米国株式 + 投資信託)。前日比・前月比・評価損益付き。各クラスには `holdings`(銘柄別)あり。出典: NISA ポートフォリオページ + ポートフォリオページ + 外国株式保有銘柄ページ
+- `old_nisa`: 旧つみたてNISA 投資信託。前日比・評価損益・銘柄別 `funds` 付き(前月比は SBI に表示がない)。出典: ポートフォリオページ
+- `other`: 現金残高 + 特定預り投資信託 + 米ドル預り金。出典: 口座サマリー / ポートフォリオページ / 外国株式口座サマリー
+- `grand_total_jpy` = `nisa.total_jpy + old_nisa.total_jpy + other.cash_jpy + other.funds_jpy + other.usd_cash.jpy`
+
+- ログインは WebAuthn 仮想認証器に保存鍵を復元して行う(パスキー自動ログイン)
+- UA は通常ブラウザを偽装している(SBI は HeadlessChrome をブロックするため)
+- 取得ページは固定 URL 3 件のみ。LLM は使わない
+
+
 ## myscrapers-sbi (Python)
 
 SBIのポートフォリオを保存する Python ベースの scraper。
