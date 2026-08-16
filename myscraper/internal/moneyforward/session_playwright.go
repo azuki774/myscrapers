@@ -7,7 +7,7 @@ import (
 
 	browserpkg "github.com/azuki774/myscrapers/myscraper/internal/browser"
 	"github.com/azuki774/myscrapers/myscraper/internal/chromium"
-	"github.com/playwright-community/playwright-go"
+	"github.com/mxschmitt/playwright-go"
 )
 
 const moneyforwardUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36"

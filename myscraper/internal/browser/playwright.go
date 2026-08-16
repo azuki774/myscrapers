@@ -12,7 +12,7 @@ import (
 
 	"github.com/azuki774/myscrapers/myscraper/internal/chromium"
 	"github.com/azuki774/myscrapers/myscraper/internal/scrape"
-	"github.com/playwright-community/playwright-go"
+	"github.com/mxschmitt/playwright-go"
 )
 
 // PlaywrightBrowser is a zero-value, stateless adapter that satisfies

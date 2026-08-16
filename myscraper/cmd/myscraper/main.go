@@ -25,6 +25,15 @@ func main() {
 			moneyforwardRunner{logger: logger, headless: true},
 		))
 	}
+	if len(os.Args) > 1 && os.Args[1] == "sbi" {
+		os.Exit(cli.RunSBI(
+			os.Args[1:],
+			os.Stdout,
+			os.Stderr,
+			logger,
+			sbiRunner{logger: logger, stdout: os.Stdout},
+		))
+	}
 	os.Exit(cli.Run(
 		os.Args[1:],
 		os.Stdout,

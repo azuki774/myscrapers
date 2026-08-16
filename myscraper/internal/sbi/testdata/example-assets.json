@@ -1,0 +1,107 @@
+{
+  "fetched_at": "2026-08-16T12:00:00Z",
+  "nisa": {
+    "total_jpy": 600000,
+    "prev_day_jpy": 12000,
+    "prev_day_pct": 2.04,
+    "prev_month_jpy": 45000,
+    "prev_month_pct": 8.11,
+    "pnl_jpy": 150000,
+    "pnl_pct": 33.33,
+    "domestic_stocks": {
+      "value_jpy": 100000,
+      "pnl_jpy": 20000,
+      "pnl_pct": 25,
+      "prev_day_jpy": 3000,
+      "prev_day_pct": 3.09,
+      "prev_month_jpy": 8000,
+      "prev_month_pct": 8.7,
+      "holdings": [
+        {
+          "name": "ダミー銘柄A",
+          "quantity": 100,
+          "unit_cost": 800,
+          "unit_price": 1000,
+          "prev_day_jpy": 30,
+          "prev_day_pct": 3.09,
+          "pnl_jpy": 20000,
+          "pnl_pct": 25,
+          "value_jpy": 100000
+        }
+      ]
+    },
+    "us_stocks": {
+      "value_jpy": 200000,
+      "pnl_jpy": 50000,
+      "pnl_pct": 33.33,
+      "prev_day_jpy": 0,
+      "prev_day_pct": 0,
+      "prev_month_jpy": 30000,
+      "prev_month_pct": 17.65,
+      "holdings": [
+        {
+          "name": "ダミー米国株",
+          "quantity": 10,
+          "unit_cost": 100,
+          "unit_price": 125.5,
+          "prev_day_jpy": 0,
+          "prev_day_pct": 0,
+          "pnl_jpy": 40000,
+          "pnl_pct": 40,
+          "value_jpy": 200000
+        }
+      ]
+    },
+    "funds": {
+      "value_jpy": 300000,
+      "pnl_jpy": 80000,
+      "pnl_pct": 36.36,
+      "prev_day_jpy": 9000,
+      "prev_day_pct": 3.09,
+      "prev_month_jpy": 7000,
+      "prev_month_pct": 2.39,
+      "holdings": [
+        {
+          "name": "ダミー投信",
+          "quantity": 100000,
+          "unit_cost": 2000,
+          "unit_price": 3000,
+          "prev_day_jpy": 90,
+          "prev_day_pct": 3.09,
+          "pnl_jpy": 80000,
+          "pnl_pct": 36.36,
+          "value_jpy": 300000
+        }
+      ]
+    }
+  },
+  "old_nisa": {
+    "total_jpy": 400000,
+    "prev_day_jpy": 10000,
+    "prev_day_pct": 2.56,
+    "pnl_jpy": 250000,
+    "pnl_pct": 166.67,
+    "funds": [
+      {
+        "name": "ダミー投信(旧)",
+        "quantity": 150000,
+        "unit_cost": 1000,
+        "unit_price": 2666.67,
+        "prev_day_jpy": 66.67,
+        "prev_day_pct": 2.56,
+        "pnl_jpy": 250000,
+        "pnl_pct": 166.67,
+        "value_jpy": 400000
+      }
+    ]
+  },
+  "other": {
+    "cash_jpy": 50000,
+    "funds_jpy": 30000,
+    "usd_cash": {
+      "usd": 500,
+      "jpy": 80000
+    }
+  },
+  "grand_total_jpy": 1160000
+}

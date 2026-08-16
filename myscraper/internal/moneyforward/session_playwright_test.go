@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/playwright-community/playwright-go"
+	"github.com/mxschmitt/playwright-go"
 )
 
 // TestPlaywrightSessionCloseIsIdempotent exercises the nil-out logic in

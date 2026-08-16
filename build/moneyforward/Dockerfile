@@ -33,11 +33,11 @@ RUN CGO_ENABLED=0 \
 
 # Pre-download the Playwright Node driver so the runtime image does not
 # need Go or network access to install it. The driver version must match
-# playwright-go's expectation (v1.52.0 for playwright-go v0.5200.1).
+# playwright-go's expectation (v1.62.1 for playwright-go v0.6201.0).
 # We only download the driver, not browsers - the runtime image uses system chromium.
 # The --version flag exits cleanly after the driver is downloaded.
 ENV PLAYWRIGHT_DRIVER_PATH=/out/playwright-driver
-RUN go run github.com/playwright-community/playwright-go/cmd/playwright@v0.5200.1 --version
+RUN go run github.com/mxschmitt/playwright-go/cmd/playwright@v0.6201.0 --version
 
 FROM ${RUNTIME_BASE}
 
