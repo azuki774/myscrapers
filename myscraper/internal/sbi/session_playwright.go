@@ -9,7 +9,7 @@ import (
 
 	browserpkg "github.com/azuki774/myscrapers/myscraper/internal/browser"
 	"github.com/azuki774/myscrapers/myscraper/internal/chromium"
-	"github.com/playwright-community/playwright-go"
+	"github.com/mxschmitt/playwright-go"
 )
 
 // ErrLoginFailed reports that the restored passkey did not result in an
