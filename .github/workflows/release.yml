@@ -1,0 +1,89 @@
+name: Release Binary
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: linux
+            arch: amd64
+          - os: linux
+            arch: arm64
+          - os: darwin
+            arch: amd64
+          - os: darwin
+            arch: arm64
+          - os: windows
+            arch: amd64
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: myscraper
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: myscraper/go.mod
+
+      - name: Build
+        env:
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}
+          CGO_ENABLED: "0"
+        run: |
+          mkdir -p dist
+          go build -trimpath -ldflags "-s -w" \
+            -o dist/myscraper${{ matrix.os == 'windows' && '.exe' || '' }} \
+            ./cmd/myscraper
+
+      - name: Package
+        shell: bash
+        run: |
+          set -euo pipefail
+          name="myscraper_${GITHUB_REF_NAME}_${{ matrix.os }}_${{ matrix.arch }}"
+          if [ "${{ matrix.os }}" = "windows" ]; then
+            (cd dist && zip -r "../dist/${name}.zip" myscraper.exe)
+          else
+            tar -C dist -czf "dist/${name}.tar.gz" myscraper
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ matrix.os }}-${{ matrix.arch }}
+          path: myscraper/dist/*
+          if-no-files-found: error
+          retention-days: 1
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          path: dist
+          pattern: "*"
+          merge-multiple: true
+
+      - name: Generate checksums
+        working-directory: dist
+        run: sha256sum * > checksums.txt
+
+      - name: Publish release
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3
+        with:
+          files: dist/*
+          generate_release_notes: true
