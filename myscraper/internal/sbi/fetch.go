@@ -31,11 +31,21 @@ const (
 	nisaPortfolioURL   = "https://site.sbisec.co.jp/account/nisa/portfolio"
 )
 
+// Status values for Assets.Status. A maintenance status means SBI
+// served a maintenance page for one or more sections; the affected
+// sections are left empty rather than failing the whole fetch.
+const (
+	StatusOK          = "ok"
+	StatusMaintenance = "maintenance"
+)
+
 // Assets is the consolidated, MECE result of a full scrape. Every JPY
 // figure is accounted for exactly once across nisa / old_nisa / other,
-// so grand_total_jpy is the plain sum of the sections.
+// so grand_total_jpy is the plain sum of the sections. Status records
+// whether the fetch completed normally or hit an SBI maintenance page.
 type Assets struct {
 	FetchedAt     time.Time `json:"fetched_at"`
+	Status        string    `json:"status"`
 	NISA          NISA      `json:"nisa"`
 	OldNISA       OldNISA   `json:"old_nisa"`
 	Other         Other     `json:"other"`
@@ -119,6 +129,7 @@ type Other struct {
 // collectively exhaustive: nisa (new NISA), old_nisa (旧つみたてNISA),
 // and other (cash + 特定預り投信 + USD deposit).
 func FetchAssets(ctx context.Context, sess Session, now time.Time) (*Assets, error) {
+	status := StatusOK
 	// 1. Portfolio page: 旧つみたてNISA and 特定預り 投資信託 sections,
 	// plus the NISA 国内株式 / NISA 投信 holding rows.
 	if err := sess.Goto(ctx, portfolioURL); err != nil {
@@ -154,9 +165,15 @@ func FetchAssets(ctx context.Context, sess Session, now time.Time) (*Assets, err
 	if err != nil {
 		return nil, err
 	}
-	nisa, err := parseNISA(nisaText)
+	var nisa NISA
+	nisa, err = parseNISA(nisaText)
 	if err != nil {
-		return nil, fmt.Errorf("parse nisa portfolio: %w", err)
+		if isMaintenancePage(nisaText) {
+			status = StatusMaintenance
+			nisa = NISA{}
+		} else {
+			return nil, fmt.Errorf("parse nisa portfolio: %w", err)
+		}
 	}
 	nisa.Domestic.Holdings = domesticHoldings
 	nisa.Funds.Holdings = fundHoldings
@@ -208,6 +225,7 @@ func FetchAssets(ctx context.Context, sess Session, now time.Time) (*Assets, err
 
 	assets := &Assets{
 		FetchedAt: now,
+		Status:    status,
 		NISA:      nisa,
 		OldNISA:   oldNisa,
 		Other: Other{
@@ -237,6 +255,23 @@ func parseAmount(s string) (float64, error) {
 		return 0, fmt.Errorf("parse amount %q: %w", m, err)
 	}
 	return v, nil
+}
+
+// isMaintenancePage reports whether the given body text is an SBI
+// maintenance/outage page rather than a normal portfolio page. SBI
+// serves such a page (e.g. after a redirect from a NISA route during
+// scheduled maintenance) with a maintenance notice and no asset data.
+func isMaintenancePage(text string) bool {
+	for _, m := range []string{
+		"臨時メンテナンスのお知らせ",
+		"メンテナンスのお知らせ",
+		"サービスのご利用ができません",
+	} {
+		if strings.Contains(text, m) {
+			return true
+		}
+	}
+	return false
 }
 
 // lines splits body text into trimmed, non-empty lines.
@@ -488,10 +523,10 @@ func parsePortfolioValue(text, key string) (float64, error) {
 
 // portfolioSection is the parsed 合計 row of a portfolio page section.
 type portfolioSection struct {
-	value     float64
-	pnl       float64
-	pnlPct    float64
-	prevDay   float64
+	value      float64
+	pnl        float64
+	pnlPct     float64
+	prevDay    float64
 	prevDayPct float64
 }
 

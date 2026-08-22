@@ -298,6 +298,9 @@ func TestExampleAssetsJSON(t *testing.T) {
 	if err := json.Unmarshal(raw, &assets); err != nil {
 		t.Fatalf("unmarshal example: %v", err)
 	}
+	if assets.Status != StatusOK {
+		t.Errorf("status = %q, want %q", assets.Status, StatusOK)
+	}
 
 	// Sections sum to grand total (MECE).
 	want := assets.NISA.TotalJPY + assets.OldNISA.TotalJPY +
