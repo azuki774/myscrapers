@@ -63,8 +63,11 @@ func RunSBI(
 }
 
 // WriteAssetsJSON marshals the asset summary and writes it either to
-// the given file or to stdout.
+// the given file or to stdout. It stamps the current schema version so
+// every emitted JSON carries schema_version as its first key,
+// regardless of how the assets value was built.
 func WriteAssetsJSON(w io.Writer, path string, assets *sbi.Assets) error {
+	assets.SchemaVersion = sbi.CurrentSchemaVersion
 	raw, err := json.MarshalIndent(assets, "", "  ")
 	if err != nil {
 		return err

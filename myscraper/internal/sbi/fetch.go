@@ -39,11 +39,19 @@ const (
 	StatusMaintenance = "maintenance"
 )
 
+// CurrentSchemaVersion is the schema_version stamped into every
+// Assets JSON output. Bump it whenever a change breaks consumers of
+// the previous version (field removal/rename, type change, or a
+// changed meaning of an existing value). Additive changes that
+// consumers can safely ignore do not bump it.
+const CurrentSchemaVersion = 1
+
 // Assets is the consolidated, MECE result of a full scrape. Every JPY
 // figure is accounted for exactly once across nisa / old_nisa / other,
 // so grand_total_jpy is the plain sum of the sections. Status records
 // whether the fetch completed normally or hit an SBI maintenance page.
 type Assets struct {
+	SchemaVersion int       `json:"schema_version"`
 	FetchedAt     time.Time `json:"fetched_at"`
 	Status        string    `json:"status"`
 	NISA          NISA      `json:"nisa"`

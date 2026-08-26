@@ -301,6 +301,9 @@ func TestExampleAssetsJSON(t *testing.T) {
 	if assets.Status != StatusOK {
 		t.Errorf("status = %q, want %q", assets.Status, StatusOK)
 	}
+	if assets.SchemaVersion != CurrentSchemaVersion {
+		t.Errorf("schema_version = %d, want %d", assets.SchemaVersion, CurrentSchemaVersion)
+	}
 
 	// Sections sum to grand total (MECE).
 	want := assets.NISA.TotalJPY + assets.OldNISA.TotalJPY +
