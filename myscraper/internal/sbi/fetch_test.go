@@ -1,11 +1,13 @@
 package sbi
 
 import (
+	"context"
 	"encoding/json"
 	"math"
 	"os"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestParseAmount(t *testing.T) {
@@ -123,7 +125,7 @@ func TestParseForeignCash(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parseForeignCash: %v", err)
 	}
-	if math.Abs(got.USD-879.30) > 0.01 || got.JPY != 140107 {
+	if math.Abs(got.Amount-879.30) > 0.01 || got.ValueJPY != 140107 {
 		t.Errorf("parseForeignCash = %+v", got)
 	}
 }
@@ -259,6 +261,62 @@ func TestParseUSHoldings(t *testing.T) {
 	}
 }
 
+// TestAssetsCashOthersShape asserts the v1 balance layout: currency
+// balances live under cash (jpy / usd) and everything else under
+// others, every entry carrying {amount, value_jpy}.
+func TestAssetsCashOthersShape(t *testing.T) {
+	sess := &fakeSession{bodies: map[string]string{
+		portfolioURL:       portfolioFixture,
+		nisaPortfolioURL:   nisaFixture,
+		foreignAssetsURL:   foreignHoldingsFixture,
+		domesticSummaryURL: cashFixture,
+		foreignSummaryURL:  foreignCashFixture,
+	}}
+	assets, err := FetchAssets(context.Background(), sess, time.Now())
+	if err != nil {
+		t.Fatalf("FetchAssets: %v", err)
+	}
+	raw, err := json.Marshal(assets)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var m map[string]any
+	if err := json.Unmarshal(raw, &m); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if _, exists := m["other"]; exists {
+		t.Errorf("legacy \"other\" key still present")
+	}
+	cash, ok := m["cash"].(map[string]any)
+	if !ok {
+		t.Fatalf("cash section missing: %s", raw)
+	}
+	for _, cur := range []string{"jpy", "usd"} {
+		entry, ok := cash[cur].(map[string]any)
+		if !ok {
+			t.Fatalf("cash.%s missing or not an object", cur)
+		}
+		if _, ok := entry["amount"]; !ok {
+			t.Errorf("cash.%s.amount missing", cur)
+		}
+		if _, ok := entry["value_jpy"]; !ok {
+			t.Errorf("cash.%s.value_jpy missing", cur)
+		}
+	}
+	others, ok := m["others"].(map[string]any)
+	if !ok {
+		t.Fatalf("others section missing: %s", raw)
+	}
+	funds, ok := others["funds"].(map[string]any)
+	if !ok {
+		t.Fatalf("others.funds missing or not an object")
+	}
+	if funds["amount"] != funds["value_jpy"] {
+		t.Errorf("others.funds amount/value_jpy = %v/%v, want equal for JPY",
+			funds["amount"], funds["value_jpy"])
+	}
+}
+
 // TestMECE asserts that the sum of the MECE sections matches the
 // grand total computed by FetchAssets.
 func TestMECE(t *testing.T) {
@@ -270,14 +328,18 @@ func TestMECE(t *testing.T) {
 			Funds:    NISAItem{ValueJPY: 2136211},
 		},
 		OldNISA: OldNISA{TotalJPY: 1383248.56},
-		Other: Other{
-			CashJPY:  24870,
-			FundsJPY: 81423.47,
-			USDCash:  Foreign{USD: 879.3, JPY: 140107},
+		Cash: CashBalances{
+			JPY: Money{Amount: 24870, ValueJPY: 24870},
+			USD: Money{Amount: 879.3, ValueJPY: 140107},
+		},
+		Others: Others{
+			Funds: Money{Amount: 81423.47, ValueJPY: 81423.47},
 		},
 	}
-	sum := assets.NISA.TotalJPY + assets.OldNISA.TotalJPY + assets.Other.CashJPY + assets.Other.FundsJPY + assets.Other.USDCash.JPY
-	want := 3771642 + 1383248.56 + 24870 + 81423.47 + 140107
+	sum := assets.NISA.TotalJPY + assets.OldNISA.TotalJPY +
+		assets.Cash.JPY.ValueJPY + assets.Cash.USD.ValueJPY +
+		assets.Others.Funds.ValueJPY
+	want := 3771642 + 1383248.56 + 24870 + 140107 + 81423.47
 	if math.Abs(sum-want) > 0.01 {
 		t.Errorf("MECE sum = %v, want %v", sum, want)
 	}
@@ -301,12 +363,26 @@ func TestExampleAssetsJSON(t *testing.T) {
 	if assets.Status != StatusOK {
 		t.Errorf("status = %q, want %q", assets.Status, StatusOK)
 	}
+	if assets.SchemaVersion != CurrentSchemaVersion {
+		t.Errorf("schema_version = %d, want %d", assets.SchemaVersion, CurrentSchemaVersion)
+	}
 
 	// Sections sum to grand total (MECE).
 	want := assets.NISA.TotalJPY + assets.OldNISA.TotalJPY +
-		assets.Other.CashJPY + assets.Other.FundsJPY + assets.Other.USDCash.JPY
+		assets.Cash.JPY.ValueJPY + assets.Cash.USD.ValueJPY +
+		assets.Others.Funds.ValueJPY
 	if math.Abs(want-assets.GrandTotalJPY) > 0.01 {
 		t.Errorf("grand total = %v, sections sum = %v", assets.GrandTotalJPY, want)
+	}
+
+	// JPY entries carry amount == value_jpy.
+	for label, e := range map[string]Money{
+		"cash.jpy":     assets.Cash.JPY,
+		"others.funds": assets.Others.Funds,
+	} {
+		if e.Amount != e.ValueJPY {
+			t.Errorf("%s amount = %v, value_jpy = %v, want equal", label, e.Amount, e.ValueJPY)
+		}
 	}
 
 	// Each NISA class sums its holdings.

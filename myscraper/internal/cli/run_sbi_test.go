@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/azuki774/myscrapers/myscraper/internal/sbi"
@@ -43,6 +44,29 @@ func writePasskeyFile(t *testing.T, dir string) string {
 		t.Fatalf("write passkey: %v", err)
 	}
 	return path
+}
+
+// TestWriteAssetsJSONStampsSchemaVersion verifies that every emitted
+// assets JSON carries schema_version as the very first key, stamped
+// with the current schema version even when the caller forgets to set
+// it.
+func TestWriteAssetsJSONStampsSchemaVersion(t *testing.T) {
+	var buf bytes.Buffer
+	if err := WriteAssetsJSON(&buf, "", &sbi.Assets{}); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	out := buf.String()
+	wantPrefix := "{\n  \"schema_version\": 1,"
+	if !strings.HasPrefix(out, wantPrefix) {
+		t.Fatalf("output does not start with %q:\n%s", wantPrefix, out)
+	}
+	var m map[string]any
+	if err := json.Unmarshal([]byte(out), &m); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if got, ok := m["schema_version"].(float64); !ok || got != float64(sbi.CurrentSchemaVersion) {
+		t.Errorf("schema_version = %v, want %d", m["schema_version"], sbi.CurrentSchemaVersion)
+	}
 }
 
 // TestRunSBIResolvesPasskeyPath verifies the passkey path resolution

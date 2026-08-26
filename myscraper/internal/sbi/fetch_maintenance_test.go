@@ -198,8 +198,8 @@ func TestFetchAssetsMaintenanceStatus(t *testing.T) {
 	if assets.OldNISA.TotalJPY != 4000 {
 		t.Errorf("OldNISA.TotalJPY = %v, want collected portfolio data", assets.OldNISA.TotalJPY)
 	}
-	if assets.Other.CashJPY != 12345 {
-		t.Errorf("Other.CashJPY = %v, want collected cash data", assets.Other.CashJPY)
+	if assets.Cash.JPY.ValueJPY != 12345 {
+		t.Errorf("Cash.JPY.ValueJPY = %v, want collected cash data", assets.Cash.JPY.ValueJPY)
 	}
 }
 
