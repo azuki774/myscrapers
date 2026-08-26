@@ -51,19 +51,35 @@ const CurrentSchemaVersion = 1
 // so grand_total_jpy is the plain sum of the sections. Status records
 // whether the fetch completed normally or hit an SBI maintenance page.
 type Assets struct {
-	SchemaVersion int       `json:"schema_version"`
-	FetchedAt     time.Time `json:"fetched_at"`
-	Status        string    `json:"status"`
-	NISA          NISA      `json:"nisa"`
-	OldNISA       OldNISA   `json:"old_nisa"`
-	Other         Other     `json:"other"`
-	GrandTotalJPY float64   `json:"grand_total_jpy"`
+	SchemaVersion int          `json:"schema_version"`
+	FetchedAt     time.Time    `json:"fetched_at"`
+	Status        string       `json:"status"`
+	NISA          NISA         `json:"nisa"`
+	OldNISA       OldNISA      `json:"old_nisa"`
+	Cash          CashBalances `json:"cash"`
+	Others        Others       `json:"others"`
+
+	GrandTotalJPY float64 `json:"grand_total_jpy"`
 }
 
-// Foreign holds USD-denominated amounts plus their JPY conversion.
-type Foreign struct {
-	USD float64 `json:"usd"`
-	JPY float64 `json:"jpy"`
+// Money is a balance entry: amount in its own currency plus its JPY
+// conversion. For JPY entries both fields carry the same value.
+type Money struct {
+	Amount   float64 `json:"amount"`
+	ValueJPY float64 `json:"value_jpy"`
+}
+
+// CashBalances holds per-currency deposit balances. JPY is 国内現金残高
+// etc.; USD is the 米ドル預り金.
+type CashBalances struct {
+	JPY Money `json:"jpy"`
+	USD Money `json:"usd"`
+}
+
+// Others holds balances outside nisa / old_nisa / cash. New sections
+// are added as keys here without bumping schema_version.
+type Others struct {
+	Funds Money `json:"funds"` // 特定預り 投資信託
 }
 
 // NISA is the new-NISA portfolio (国内株式 + 米国株式 + 投資信託) with
@@ -122,14 +138,6 @@ type OldNISA struct {
 	PnLJPY     float64   `json:"pnl_jpy"`
 	PnLPct     float64   `json:"pnl_pct"`
 	Funds      []Holding `json:"funds"`
-}
-
-// Other holds everything outside NISA: 現金残高, 特定預り 投資信託, and
-// the USD deposit. Data sources: account summary and foreign summary.
-type Other struct {
-	CashJPY  float64 `json:"cash_jpy"`
-	FundsJPY float64 `json:"funds_jpy"`
-	USDCash  Foreign `json:"usd_cash"`
 }
 
 // FetchAssets scrapes the four fixed pages and returns the
@@ -236,13 +244,15 @@ func FetchAssets(ctx context.Context, sess Session, now time.Time) (*Assets, err
 		Status:    status,
 		NISA:      nisa,
 		OldNISA:   oldNisa,
-		Other: Other{
-			CashJPY:  cash,
-			FundsJPY: otherFunds,
-			USDCash:  usdCash,
+		Cash: CashBalances{
+			JPY: Money{Amount: cash, ValueJPY: cash},
+			USD: usdCash,
+		},
+		Others: Others{
+			Funds: Money{Amount: otherFunds, ValueJPY: otherFunds},
 		},
 	}
-	assets.GrandTotalJPY = nisa.TotalJPY + oldNisa.TotalJPY + cash + otherFunds + usdCash.JPY
+	assets.GrandTotalJPY = nisa.TotalJPY + oldNisa.TotalJPY + cash + otherFunds + usdCash.ValueJPY
 	return assets, nil
 }
 
@@ -580,22 +590,22 @@ func findPortfolioSection(text, key string) (portfolioSection, error) {
 
 // parseForeignCash extracts the USD 預り金 from the foreign 口座サマリー
 // body text (米ドル row of the 保有資産評価 table).
-func parseForeignCash(text string) (Foreign, error) {
+func parseForeignCash(text string) (Money, error) {
 	ls := lines(text)
 	for i, l := range ls {
 		if l == "米ドル" && i+2 < len(ls) {
 			usd, err := parseAmount(ls[i+1])
 			if err != nil {
-				return Foreign{}, err
+				return Money{}, err
 			}
 			jpy, err := parseAmount(ls[i+2])
 			if err != nil {
-				return Foreign{}, err
+				return Money{}, err
 			}
-			return Foreign{USD: usd, JPY: jpy}, nil
+			return Money{Amount: usd, ValueJPY: jpy}, nil
 		}
 	}
-	return Foreign{}, fmt.Errorf("米ドル deposit row not found")
+	return Money{}, fmt.Errorf("米ドル deposit row not found")
 }
 
 // parseNISA extracts the summary block of the NISA portfolio page:

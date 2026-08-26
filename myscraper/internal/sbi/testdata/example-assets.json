@@ -97,12 +97,20 @@
       }
     ]
   },
-  "other": {
-    "cash_jpy": 50000,
-    "funds_jpy": 30000,
-    "usd_cash": {
-      "usd": 500,
-      "jpy": 80000
+  "cash": {
+    "jpy": {
+      "amount": 50000,
+      "value_jpy": 50000
+    },
+    "usd": {
+      "amount": 500,
+      "value_jpy": 80000
+    }
+  },
+  "others": {
+    "funds": {
+      "amount": 30000,
+      "value_jpy": 30000
     }
   },
   "grand_total_jpy": 1160000

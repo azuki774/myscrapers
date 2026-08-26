@@ -149,7 +149,8 @@ S3 から cookie ファイルをダウンロードしてローカルに保存す
   "fetched_at": "2026-08-16T12:00:00Z",
   "nisa": { ... },
   "old_nisa": { ... },
-  "other": { ... },
+  "cash": { ... },
+  "others": { ... },
   "grand_total_jpy": 1160000
 }
 ```
@@ -162,8 +163,18 @@ S3 から cookie ファイルをダウンロードしてローカルに保存す
 | `fetched_at` | 取得実行時刻（RFC 3339 / ISO 8601 形式） |
 | `nisa` | 新 NISA ポートフォリオ全体（国内株式 + 米国株式 + 投資信託）。残高・前日比/率・前月比/率・評価損益/率と、資産クラス別内訳を持つ |
 | `old_nisa` | 旧つみたてNISA 投資信託。残高・前日比/率・評価損益/率と銘柄別内訳を持つ（前月比は SBI 側で表示が無いため存在しない） |
-| `other` | NISA 以外。国内現金残高（`cash_jpy`）、特定預り投資信託（`funds_jpy`）、米ドル預り金（`usd_cash`） |
+| `cash` | 預り金残高。通貨別（`jpy` / `usd`）の金額エントリを持つ（下記「金額エントリ」参照） |
+| `others` | nisa / old_nisa / cash 以外。現在は特定預り投資信託（`funds`）のみ。将来のセクション追加はここに行われる |
 | `grand_total_jpy` | 全資産合計（円）。下記 MECE 合計と一致 |
+
+**金額エントリ**: `cash` / `others` 配下の各項目は、必ず次の 2 フィールドを持つオブジェクトである。
+
+| フィールド | 内容 |
+|---|---|
+| `amount` | 自通貨建ての数量（JPY エントリなら円、USD エントリなら米ドル） |
+| `value_jpy` | 円換算評価額。JPY エントリでは `amount` と同値になる |
+
+取り込み側は条件分岐なしにすべての `value_jpy` を合計すればよい。
 
 `grand_total_jpy` の計算式（MECE: 重複なし・漏れなし）:
 
@@ -171,9 +182,9 @@ S3 から cookie ファイルをダウンロードしてローカルに保存す
 grand_total_jpy =
   nisa.total_jpy
   + old_nisa.total_jpy
-  + other.cash_jpy
-  + other.funds_jpy
-  + other.usd_cash.jpy
+  + cash.jpy.value_jpy
+  + cash.usd.value_jpy
+  + others.funds.value_jpy
 ```
 
 ### 4.1 `nisa` 詳細
@@ -211,13 +222,22 @@ grand_total_jpy =
 | `total_jpy`, `prev_day_jpy`, `prev_day_pct`, `pnl_jpy`, `pnl_pct` | 口座全体の残高・前日比・評価損益 |
 | `funds` | 銘柄別明細の配列（上部の銘柄明細と同じ形式） |
 
-### 4.3 `other` 詳細
+### 4.3 `cash` / `others` 詳細
+
+`cash`:
 
 | フィールド | 内容 |
 |---|---|
-| `cash_jpy` | 国内現金残高等（円） |
-| `funds_jpy` | 特定預りの投資信託（円） |
-| `usd_cash` | 米ドル預り金。`usd`（米ドル建て数量）と `jpy`（円換算評価額）を含む |
+| `jpy` | 国内現金残高等。金額エントリ（`amount` = `value_jpy` = 円額） |
+| `usd` | 米ドル預り金。金額エントリ（`amount` = 米ドル数量、`value_jpy` = 円換算評価額） |
+
+`others`:
+
+| フィールド | 内容 |
+|---|---|
+| `funds` | 特定預りの投資信託。金額エントリ（円） |
+
+将来 `others` に新しいセクションキーを追加する場合は後方互換変更とし、`schema_version` は上げない。
 
 完全なサンプルは `myscraper/internal/sbi/testdata/example-assets.json` を参照（`go test` で構造・`schema_version` と MECE 整合性が検証される）。
 
