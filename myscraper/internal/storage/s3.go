@@ -134,6 +134,9 @@ func (s *Store) putObject(ctx context.Context, key, contentType string, body io.
 }
 
 // Download gets an object under the prefix and writes it to destPath.
+// It writes to a temp file with 0600 perms and renames to destPath on
+// success, so a failed or partial download never leaves a corrupt file
+// at destPath. destPath's parent directory must already exist.
 func (s *Store) Download(ctx context.Context, key, destPath string) error {
 	fullKey := s.prefix + "/" + key
 	out, err := s.client.GetObject(ctx, &s3.GetObjectInput{
@@ -144,16 +147,30 @@ func (s *Store) Download(ctx context.Context, key, destPath string) error {
 		return fmt.Errorf("get %s: %w", fullKey, err)
 	}
 	defer out.Body.Close()
-	f, err := os.Create(destPath)
+
+	dir := filepath.Dir(destPath)
+	tmp, err := os.CreateTemp(dir, "myscraper-download-*")
 	if err != nil {
-		return fmt.Errorf("create %s: %w", destPath, err)
+		return fmt.Errorf("create temp for %s: %w", destPath, err)
 	}
-	if _, err := io.Copy(f, out.Body); err != nil {
-		f.Close()
+	tmpName := tmp.Name()
+	if err := os.Chmod(tmpName, 0o600); err != nil {
+		tmp.Close()
+		os.Remove(tmpName)
+		return fmt.Errorf("chmod temp %s: %w", tmpName, err)
+	}
+	if _, err := io.Copy(tmp, out.Body); err != nil {
+		tmp.Close()
+		os.Remove(tmpName)
 		return fmt.Errorf("write %s: %w", destPath, err)
 	}
-	if err := f.Close(); err != nil {
-		return fmt.Errorf("close %s: %w", destPath, err)
+	if err := tmp.Close(); err != nil {
+		os.Remove(tmpName)
+		return fmt.Errorf("close temp %s: %w", tmpName, err)
+	}
+	if err := os.Rename(tmpName, destPath); err != nil {
+		os.Remove(tmpName)
+		return fmt.Errorf("rename to %s: %w", destPath, err)
 	}
 	return nil
 }

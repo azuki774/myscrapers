@@ -48,3 +48,6 @@ go/myscraper/myscraper
 
 # Local git worktrees
 .worktrees/
+
+# Superpowers specs/plans are local working docs, not committed
+docs/superpowers/

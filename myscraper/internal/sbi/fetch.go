@@ -19,6 +19,12 @@ type S3Client interface {
 	KeyForTime(now time.Time) string
 }
 
+// PasskeyS3Key is the fixed object key (relative to BUCKET_DIR) under
+// which the SBI passkey bundle is stored when running in S3 mode. It
+// shares the result prefix so the same BUCKET_DIR covers both inputs
+// and outputs.
+const PasskeyS3Key = "passkey.json"
+
 // FetchOptions carries the inputs for a full SBI asset scrape.
 type FetchOptions struct {
 	PasskeyPath string

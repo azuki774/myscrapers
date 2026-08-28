@@ -243,13 +243,18 @@ grand_total_jpy =
 
 ### 4.4 S3 アップロード（`--s3-upload`）
 
-`--s3-upload` を指定すると、stdout/ファイルへ出力した JSON と同じバイト列を S3 にも保存する。必要環境変数は MoneyForward の `--s3-upload` と共通（`BUCKET_URL`, `BUCKET_NAME`, `BUCKET_DIR`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`）。
+`--s3-upload` を指定すると、**入力のパスキーも S3 から取得**し、stdout/ファイルへ出力した JSON と同じバイト列を S3 にも保存する。S3 モードではローカルの `--passkey` / `SBI_PASSKEY_PATH` は無視される（警告ログを出力）。必要環境変数は MoneyForward の `--s3-upload` と共通（`BUCKET_URL`, `BUCKET_NAME`, `BUCKET_DIR`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`）。
 
-- オブジェクトキー: `BUCKET_DIR/YYYY/MM/YYYYMMDD-HHMMSS.json`（取得時刻を JST に変換）。実行ごとに履歴として残る。
+- パスキー取得元: `s3://<BUCKET_NAME>/<BUCKET_DIR>/passkey.json`。ダウンロードは一時ファイル（0600）へ行い、検証後にログインへ渡す。処理終了時に一時ファイルは削除される。
+- オブジェクトキー（結果）: `BUCKET_DIR/YYYY/MM/YYYYMMDD-HHMMSS.json`（取得時刻を JST に変換）。実行ごとに履歴として残る。
 - Content-Type: `application/json`
 - 保存タイミング: 先に stdout/ファイルへ出力した後、S3 へアップロードする。
 - メンテナンス時: `status: "maintenance"` を含む部分的な JSON も、通常の成功結果として同様に保存する。
-- 失敗時: S3 アップロード失敗時は、それまでの stdout/ファイル出力は残したままコマンドは終了コード 1 になる。不足環境変数は取得前の構築時に検出されエラーになる。
+- 失敗時:
+  - S3 環境変数の不足、パスキーのダウンロード失敗、ダウンロードしたパスキーの検証失敗はいずれも終了コード 1（ログイン・取得は行わない）。
+  - S3 アップロード失敗時は、それまでの stdout/ファイル出力は残したままコマンドは終了コード 1 になる。
+
+`--s3-upload` を付けないローカルモードでは、従来どおり `--passkey` / `SBI_PASSKEY_PATH` / 既定ローカルパスからパスキーを読み、S3 へは保存しない。
 
 ### 4.5 スキーマバージョニング
 

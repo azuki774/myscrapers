@@ -8,7 +8,6 @@ import (
 
 	"github.com/azuki774/myscrapers/myscraper/internal/cli"
 	"github.com/azuki774/myscrapers/myscraper/internal/sbi"
-	"github.com/azuki774/myscrapers/myscraper/internal/storage"
 )
 
 // sbiRunner is the production cli.SBIRunner: it opens a
@@ -44,16 +43,10 @@ func (r sbiRunner) RunAssets(ctx context.Context, opts sbi.FetchOptions) error {
 		return fmt.Errorf("write assets json: %w", err)
 	}
 	if opts.S3Upload {
-		client := opts.S3Client
-		if client == nil {
-			r.logger.Info("creating S3 store")
-			store, err := storage.New(ctx)
-			if err != nil {
-				return fmt.Errorf("build s3 store: %w", err)
-			}
-			client = store
+		if opts.S3Client == nil {
+			return fmt.Errorf("s3 upload requested but no S3 client configured")
 		}
-		key, err := cli.UploadAssetsJSON(ctx, client, opts.Now, raw)
+		key, err := cli.UploadAssetsJSON(ctx, opts.S3Client, opts.Now, raw)
 		if err != nil {
 			return fmt.Errorf("upload assets json: %w", err)
 		}
