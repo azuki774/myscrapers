@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -126,7 +127,7 @@ func TestRunSBIResolvesPasskeyPath(t *testing.T) {
 		_ = r
 	})
 
-  t.Run("missing file errors", func(t *testing.T) {
+	t.Run("missing file errors", func(t *testing.T) {
 		t.Setenv("SBI_PASSKEY_PATH", filepath.Join(t.TempDir(), "nope.json"))
 		r := &fakeSBIRunner{}
 		code := RunSBI([]string{"sbi"}, stdout, stderr, logger, r)
@@ -139,9 +140,12 @@ func TestRunSBIResolvesPasskeyPath(t *testing.T) {
 	})
 
 	t.Run("s3-upload flag sets opts", func(t *testing.T) {
-		dir := t.TempDir()
-		path := writePasskeyFile(t, dir)
-		t.Setenv("SBI_PASSKEY_PATH", path)
+		t.Setenv("SBI_PASSKEY_PATH", writePasskeyFile(t, t.TempDir()))
+
+		store := &fakeStore{}
+		orig := buildS3Store
+		buildS3Store = func(context.Context) (s3Store, error) { return store, nil }
+		defer func() { buildS3Store = orig }()
 
 		r := &fakeSBIRunner{}
 		code := RunSBI([]string{"sbi", "--s3-upload"}, stdout, stderr, logger, r)
@@ -151,7 +155,100 @@ func TestRunSBIResolvesPasskeyPath(t *testing.T) {
 		if !r.lastOpts.S3Upload {
 			t.Errorf("S3Upload = %v, want true", r.lastOpts.S3Upload)
 		}
+		if r.lastOpts.S3Client == nil {
+			t.Errorf("S3Client = nil, want injected store")
+		}
+		if !store.downloadCalled {
+			t.Errorf("passkey Download was not called in S3 mode")
+		}
 	})
+}
+
+// TestRunSBIS3ModeDownloadsPasskey verifies that in S3 mode the passkey
+// is fetched from S3 (BUCKET_DIR/passkey.json) rather than the local
+// --passkey path, and the runner receives the downloaded temp path.
+func TestRunSBIS3ModeDownloadsPasskey(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	logger := slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil))
+
+	localPath := writePasskeyFile(t, t.TempDir())
+	store := &fakeStore{}
+	orig := buildS3Store
+	buildS3Store = func(context.Context) (s3Store, error) { return store, nil }
+	defer func() { buildS3Store = orig }()
+
+	r := &fakeSBIRunner{}
+	code := RunSBI([]string{"sbi", "--s3-upload", "--passkey", localPath}, stdout, stderr, logger, r)
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stderr=%s)", code, stderr.String())
+	}
+	if r.lastOpts.PasskeyPath == localPath {
+		t.Errorf("passkey path = %q, want the S3-downloaded temp path", r.lastOpts.PasskeyPath)
+	}
+	if r.lastOpts.S3Client == nil {
+		t.Errorf("S3Client = nil, want injected store")
+	}
+	if !store.downloadCalled {
+		t.Errorf("passkey Download was not called in S3 mode")
+	}
+}
+
+// TestRunSBIS3ModeDownloadFailureErrors verifies that when the passkey
+// cannot be downloaded from S3, RunSBI returns a non-zero exit code and
+// never dispatches to the runner.
+func TestRunSBIS3ModeDownloadFailureErrors(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	logger := slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil))
+
+	store := &fakeStore{failDownload: true}
+	orig := buildS3Store
+	buildS3Store = func(context.Context) (s3Store, error) { return store, nil }
+	defer func() { buildS3Store = orig }()
+
+	r := &fakeSBIRunner{}
+	code := RunSBI([]string{"sbi", "--s3-upload"}, stdout, stderr, logger, r)
+	if code == 0 {
+		t.Fatalf("exit code = 0, want non-zero")
+	}
+	if r.runCalls != 0 {
+		t.Errorf("runner called %d times, want 0", r.runCalls)
+	}
+}
+
+// fakeStore records S3 activity and satisfies the s3Store interface.
+// Its Download writes a minimal valid passkey JSON to destPath.
+type fakeStore struct {
+	downloadCalled bool
+	failDownload   bool
+}
+
+func (f *fakeStore) PutJSON(_ context.Context, _ string, _ io.Reader) error { return nil }
+
+func (f *fakeStore) KeyForTime(now time.Time) string {
+	return "myscrapers/sbi/" + now.Format("2006/01/20060102-150405") + ".json"
+}
+
+func (f *fakeStore) Download(_ context.Context, key, destPath string) error {
+	f.downloadCalled = true
+	if f.failDownload {
+		return fmt.Errorf("boom")
+	}
+	if key != sbi.PasskeyS3Key {
+		return fmt.Errorf("unexpected key %q", key)
+	}
+	raw, err := json.Marshal(sbi.PasskeyFile{
+		Credentials: []sbi.PasskeyCredential{{
+			CredentialID: "Y3JlZGVudGlhbElk",
+			RPID:         "sbisec.co.jp",
+			PrivateKey:   "cHJpdmF0ZUtleQ==",
+		}},
+	})
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(destPath, raw, 0o600)
 }
 
 // fakeS3Client records the key and body passed to PutJSON and derives the
