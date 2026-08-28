@@ -40,10 +40,10 @@ export AWS_REGION=auto
 export AWS_ACCESS_KEY_ID=AKIA...
 export AWS_SECRET_ACCESS_KEY=...
 go run ./cmd/myscraper sbi --s3-upload
-# → 取得 JSON を s3://my-bucket/myscrapers/sbi/YYYYMM/YYYYMMDD-HHMMSS.json に保存(JST)
+# → 取得 JSON を s3://my-bucket/myscrapers/sbi/YYYY/MM/YYYYMMDD-HHMMSS.json に保存(JST)
 ```
 
-- キーは取得時刻を JST に変換した `BUCKET_DIR/YYYYMM/YYYYMMDD-HHMMSS.json` で、実行ごとに履歴として残ります。
+- キーは取得時刻を JST に変換した `BUCKET_DIR/YYYY/MM/YYYYMMDD-HHMMSS.json` で、実行ごとに履歴として残ります。
 - Content-Type は `application/json` です。
 - `status: "maintenance"` を含む部分的な JSON も、通常の成功結果として同様に保存します。
 - S3 アップロードに失敗しても、それまでの stdout/ファイル出力は残り、コマンドは終了コード 1 になります。

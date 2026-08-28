@@ -172,7 +172,7 @@ func (f *fakeS3Client) PutJSON(_ context.Context, key string, body io.Reader) er
 }
 
 func (f *fakeS3Client) KeyForTime(now time.Time) string {
-	return "myscrapers/sbi/" + now.Format("200601/20060102-150405") + ".json"
+	return "myscrapers/sbi/" + now.Format("2006/01/20060102-150405") + ".json"
 }
 
 func TestUploadAssetsJSONUsesSameBytes(t *testing.T) {
@@ -184,8 +184,8 @@ func TestUploadAssetsJSONUsesSameBytes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("UploadAssetsJSON() error = %v", err)
 	}
-	if key != "myscrapers/sbi/202412/20241209-010203.json" {
-		t.Fatalf("key = %q, want %q", key, "myscrapers/sbi/202412/20241209-010203.json")
+	if key != "myscrapers/sbi/2024/12/20241209-010203.json" {
+		t.Fatalf("key = %q, want %q", key, "myscrapers/sbi/2024/12/20241209-010203.json")
 	}
 	if !bytes.Equal(client.body, raw) {
 		t.Fatalf("uploaded body = %q, want %q", client.body, raw)

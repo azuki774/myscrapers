@@ -165,9 +165,9 @@ func (s *Store) KeyForTime(now time.Time) string {
 }
 
 // KeyForTimestamp builds a timestamped key from an explicit prefix, using
-// JST for the date components: <prefix>/YYYYMM/YYYYMMDD-HHMMSS.json.
+// JST for the date components: <prefix>/YYYY/MM/YYYYMMDD-HHMMSS.json.
 func KeyForTimestamp(prefix string, now time.Time) string {
 	jst := time.FixedZone("JST", 9*60*60)
 	t := now.In(jst)
-	return fmt.Sprintf("%s/%s.json", prefix, t.Format("200601/20060102-150405"))
+	return fmt.Sprintf("%s/%s.json", prefix, t.Format("2006/01/20060102-150405"))
 }

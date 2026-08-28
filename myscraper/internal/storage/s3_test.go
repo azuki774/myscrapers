@@ -71,8 +71,8 @@ func TestStoreKeyFor(t *testing.T) {
 func TestStoreKeyForTime(t *testing.T) {
 	s := &Store{prefix: "myscrapers/sbi"}
 	now := time.Date(2024, 12, 9, 1, 2, 3, 0, time.UTC)
-	if got := s.KeyForTime(now); got != "myscrapers/sbi/202412/20241209-100203.json" {
-		t.Fatalf("KeyForTime() = %q, want %q", got, "myscrapers/sbi/202412/20241209-100203.json")
+	if got := s.KeyForTime(now); got != "myscrapers/sbi/2024/12/20241209-100203.json" {
+		t.Fatalf("KeyForTime() = %q, want %q", got, "myscrapers/sbi/2024/12/20241209-100203.json")
 	}
 }
 

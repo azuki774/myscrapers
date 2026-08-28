@@ -245,7 +245,7 @@ grand_total_jpy =
 
 `--s3-upload` を指定すると、stdout/ファイルへ出力した JSON と同じバイト列を S3 にも保存する。必要環境変数は MoneyForward の `--s3-upload` と共通（`BUCKET_URL`, `BUCKET_NAME`, `BUCKET_DIR`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`）。
 
-- オブジェクトキー: `BUCKET_DIR/YYYYMM/YYYYMMDD-HHMMSS.json`（取得時刻を JST に変換）。実行ごとに履歴として残る。
+- オブジェクトキー: `BUCKET_DIR/YYYY/MM/YYYYMMDD-HHMMSS.json`（取得時刻を JST に変換）。実行ごとに履歴として残る。
 - Content-Type: `application/json`
 - 保存タイミング: 先に stdout/ファイルへ出力した後、S3 へアップロードする。
 - メンテナンス時: `status: "maintenance"` を含む部分的な JSON も、通常の成功結果として同様に保存する。
