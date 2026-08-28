@@ -111,24 +111,10 @@ go run ./cmd/myscraper sbi
 - 取得ページは固定 URL 3 件のみ。LLM は使わない
 
 
-## myscrapers-sbi (Python)
-
-SBIのポートフォリオを保存する Python ベースの scraper。
-実装は `src/sbi/` 配下にある。
-
-- https://site1.sbisec.co.jp/ETGate/ に自動的にログインして、ポートフォリオの表ごとに保存する。
-- 出力先は、コンテナ内の /data/YYYYMMDD_x.csv
-    - x: 連番
-    - outputDir オプションがあった場合は、${outputDir}/YYYYMM/YYYYMMDD_x.csv
-- s3ストレージにアップロードへの機能がある。
-    - 環境変数 `BUCKET_NAME`があった場合、取得したデータを `s3://${BUCKET_NAME}/${REMOTE_DIR}/YYYYMM/YYYYMMDD/` に保存。
-
 ## myscrapers (Go)
 
 マネーフォワードの家計簿パートを保存する Go ベースの scraper。
 実装は `myscraper/` 配下にある。
-
-Python 版の実装は `src/moneyforward/` に残している（legacy 扱い）。
 
 - 同時に、口座更新のボタンも押して、データを更新する
 - 出力先は、コンテナ内の /data/cf.csv, /data/cf_lastmonth.csv, /data/asset_history.csv
