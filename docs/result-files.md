@@ -17,7 +17,7 @@
 ## 共通仕様
 
 - **文字エンコーディング**: 全結果ファイルとも UTF-8（BOM なし）。
-  - 注: legacy Python 版（`src/moneyforward/main.py`）は CSV を Shift_JIS へ変換していたが、Go 実装では変換を行わないため、UTF-8 のまま書き出される。`docs/myscrapers.md` の Shift-JIS 記述は現行実装との乖離がある。
+  - 注: Go 実装は CSV を Shift-JIS へ変換せず、UTF-8 のまま書き出す。`docs/myscrapers.md` の Shift-JIS 記述は現行実装との乖離がある。
 - **改行コード**: LF。
 - **時刻**: `moneyforward` の日付変換、および `sbi` の `fetched_at` は実行時時刻（`time.Now()`）を使用する。
 

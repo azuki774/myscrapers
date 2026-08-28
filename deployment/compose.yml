@@ -14,5 +14,22 @@ services:
       - playwright-driver:/playwright
     command: ["moneyforward", "--fetch"]
 
+  myscrapers-sbi:
+    build:
+      context: ..
+      dockerfile: build/sbi/Dockerfile
+    image: myscrapers-sbi:latest
+    container_name: myscrapers-sbi
+    environment:
+      TZ: Asia/Tokyo
+      PLAYWRIGHT_DRIVER_PATH: /playwright/.driver
+    volumes:
+      - .:/data
+      - playwright-driver:/playwright
+    # Local mode: requires a passkey mounted at /data/sbi-passkey.json.
+    # For S3 mode, override the command to ["sbi", "--s3-upload"] and set
+    # the BUCKET_*/AWS_* environment variables instead.
+    command: ["sbi", "--passkey", "/data/sbi-passkey.json"]
+
 volumes:
   playwright-driver:

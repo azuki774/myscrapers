@@ -1,6 +1,6 @@
 # myscrapers (Go) — Usage Guide
 
-myscrapers is a containerised Go CLI that scrapes MoneyForward household-accounting pages and either writes CSV files locally or uploads them to S3. It replaces the legacy Python scraper under `src/moneyforward/`.
+myscrapers is a containerised Go CLI that scrapes MoneyForward household-accounting pages and either writes CSV files locally or uploads them to S3.
 
 ## Binary
 

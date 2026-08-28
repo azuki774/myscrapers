@@ -1,35 +1,73 @@
-FROM python:3.13-bookworm
+# syntax=docker/dockerfile:1.7
 
-# Required Packages
+# Base images are pinned to immutable digests for reproducible builds.
+# Refresh via:
+#   token=$(curl -fsS "https://auth.docker.io/token?service=registry.docker.io&scope=repository:library/<image>:pull" | jq -r .token)
+#   curl -fsS -D - -o /dev/null \
+#     "https://registry-1.docker.io/v2/library/<image>/manifests/<tag>" \
+#     -H "Authorization: Bearer ${token}" \
+#     -H 'Accept: application/vnd.docker.distribution.manifest.list.v2+json' \
+#     | grep -i docker-content-digest
+ARG GO_BASE=golang:1.25-bookworm@sha256:a1ae6b6c564f3e0072d70081036827a2705dbcf6b38aaa6d97f5de97fe9abdb4
+ARG RUNTIME_BASE=debian:bookworm-slim@sha256:0104b334637a5f19aa9c983a91b54c89887c0984081f2068983107a6f6c21eeb
+
+FROM ${GO_BASE} AS builder
+WORKDIR /src
+
+# Cache module download layer separately from source.
+COPY myscraper/go.mod myscraper/go.sum ./
+RUN go mod download
+
+COPY myscraper/ ./
+# Reproducible Go binary: strip host paths and embed no VCS info.
+# Override with --build-arg SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)
+# at build time for bit-for-bit identical image layers.
+ARG SOURCE_DATE_EPOCH=0
+ENV SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH}
+RUN CGO_ENABLED=0 \
+    go build \
+      -trimpath \
+      -buildvcs=false \
+      -ldflags=-buildid= \
+      -o /out/myscraper ./cmd/myscraper
+
+# Pre-download the Playwright Node driver so the runtime image does not
+# need Go or network access to install it. The driver version must match
+# playwright-go's expectation (v1.62.1 for playwright-go v0.6201.0).
+# We only download the driver, not browsers - the runtime image uses system chromium.
+# The --version flag exits cleanly after the driver is downloaded.
+ENV PLAYWRIGHT_DRIVER_PATH=/out/playwright-driver
+RUN go run github.com/mxschmitt/playwright-go/cmd/playwright@v0.6201.0 --version
+
+FROM ${RUNTIME_BASE}
+
+# Debian's `chromium` is on PATH and is the first match in
+# myscraper/internal/chromium/exec.go's lookup, so no third-party
+# apt source or apt-key is required. The apt version is intentionally
+# NOT pinned so `apt-get upgrade` can roll forward with Debian
+# security updates; only the base image is digest-pinned.
 RUN apt-get update && \
-    apt-get install -y \
-    curl \
-    unzip \
-    wget \
-    unzip \
-    libglib2.0-0 \
-    libnss3 \
-    libgconf-2-4 \
-    libfontconfig1 && \
-    apt-get clean && \
+    apt-get install -y --no-install-recommends \
+      ca-certificates \
+      chromium \
+      fonts-noto-cjk \
+      libglib2.0-0 \
+      libnss3 \
+      libfontconfig1 && \
     rm -rf /var/lib/apt/lists/*
 
-# Install Chrome
-RUN wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add -
-RUN echo "deb http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list
-RUN apt-get update && apt-get install -y google-chrome-stable && apt-get clean && rm -rf /var/lib/apt/lists/*
+ENV PLAYWRIGHT_DRIVER_PATH=/playwright/.driver
+COPY --from=builder /out/playwright-driver ${PLAYWRIGHT_DRIVER_PATH}
+RUN chmod +x ${PLAYWRIGHT_DRIVER_PATH}/node
 
-# Install driver (Ref. https://sleepless-se.net/2024/03/19/python-selenium-docker/)
-RUN wget -O chrome.json https://googlechromelabs.github.io/chrome-for-testing/known-good-versions-with-downloads.json && \
-    LINUX_STABLE_URL=$(grep -oP '"url":".*?(?=")' chrome.json | grep 'linux64' | head -n 1 | cut -d'"' -f4) && \
-    wget -O chrome.zip $LINUX_STABLE_URL && \
-    unzip chrome.zip && \
-    rm chrome.zip chrome.json
+RUN useradd --system --uid 10001 --create-home --home-dir /home/myscraper myscraper
+WORKDIR /home/myscraper
 
-# Install Python module
-COPY /src/sbi/requirements.txt /tmp/
-RUN pip install --upgrade pip && pip install -r /tmp/requirements.txt && mkdir -p /data
-COPY src/sbi/ /src/
+COPY --from=builder /out/myscraper /usr/local/bin/myscraper
+RUN mkdir -p /data && chown -R myscraper:myscraper /data
+VOLUME ["/data"]
+ENV TZ=Asia/Tokyo
 
-CMD [ "--s3-upload" ]
-ENTRYPOINT ["python3", "-u", "/src/main.py"]
+USER myscraper
+ENTRYPOINT ["myscraper"]
+CMD ["sbi", "--s3-upload"]
