@@ -3,6 +3,7 @@ package sbi
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"regexp"
 	"strconv"
@@ -10,6 +11,13 @@ import (
 	"time"
 	"unicode"
 )
+
+// S3Client is the minimal S3 surface the SBI runner needs to archive a
+// scraped Assets JSON. storage.Store satisfies it.
+type S3Client interface {
+	PutJSON(ctx context.Context, key string, body io.Reader) error
+	KeyForTime(now time.Time) string
+}
 
 // FetchOptions carries the inputs for a full SBI asset scrape.
 type FetchOptions struct {
@@ -19,6 +27,11 @@ type FetchOptions struct {
 	Now         time.Time
 	Logger      *slog.Logger
 	Headless    bool
+	// S3Upload, when true, archives the emitted JSON to S3 after writing
+	// it locally/stdout. S3Client is optional; when nil the runner builds
+	// a store from the environment.
+	S3Upload bool
+	S3Client S3Client
 }
 
 // Fixed page URLs. These never change for a given login session; the
