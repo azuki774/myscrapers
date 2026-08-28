@@ -30,6 +30,24 @@ go run ./cmd/myscraper sbi --passkey ~/.local/state/opencode/sbi-passkey.json \
   --output ./out/assets.json
 ```
 
+S3 へのアップロードも `--s3-upload` で行えます。有効化すると、stdout/ファイルへ出力した JSON と同じ内容を S3 に保存します。必須環境変数は MoneyForward と共通(`BUCKET_URL`, `BUCKET_NAME`, `BUCKET_DIR`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`)です。
+
+```bash
+export BUCKET_URL=https://...
+export BUCKET_NAME=my-bucket
+export BUCKET_DIR=myscrapers/sbi
+export AWS_REGION=auto
+export AWS_ACCESS_KEY_ID=AKIA...
+export AWS_SECRET_ACCESS_KEY=...
+go run ./cmd/myscraper sbi --s3-upload
+# → 取得 JSON を s3://my-bucket/myscrapers/sbi/YYYYMM/YYYYMMDD-HHMMSS.json に保存(JST)
+```
+
+- キーは取得時刻を JST に変換した `BUCKET_DIR/YYYYMM/YYYYMMDD-HHMMSS.json` で、実行ごとに履歴として残ります。
+- Content-Type は `application/json` です。
+- `status: "maintenance"` を含む部分的な JSON も、通常の成功結果として同様に保存します。
+- S3 アップロードに失敗しても、それまでの stdout/ファイル出力は残り、コマンドは終了コード 1 になります。
+
 パスキーの指定は `--passkey` フラグが最優先で、省略時は環境変数 `SBI_PASSKEY_PATH`、それも無ければデフォルト `~/.local/state/opencode/sbi-passkey.json` を使います:
 
 ```bash

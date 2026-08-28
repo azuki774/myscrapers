@@ -239,9 +239,19 @@ grand_total_jpy =
 
 将来 `others` に新しいセクションキーを追加する場合は後方互換変更とし、`schema_version` は上げない。
 
-完全なサンプルは `myscraper/internal/sbi/testdata/example-assets.json` を参照（`go test` で構造・`schema_version` と MECE 整合性が検証される）。
+ 完全なサンプルは `myscraper/internal/sbi/testdata/example-assets.json` を参照（`go test` で構造・`schema_version` と MECE 整合性が検証される）。
 
-### 4.4 スキーマバージョニング
+### 4.4 S3 アップロード（`--s3-upload`）
+
+`--s3-upload` を指定すると、stdout/ファイルへ出力した JSON と同じバイト列を S3 にも保存する。必要環境変数は MoneyForward の `--s3-upload` と共通（`BUCKET_URL`, `BUCKET_NAME`, `BUCKET_DIR`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`）。
+
+- オブジェクトキー: `BUCKET_DIR/YYYYMM/YYYYMMDD-HHMMSS.json`（取得時刻を JST に変換）。実行ごとに履歴として残る。
+- Content-Type: `application/json`
+- 保存タイミング: 先に stdout/ファイルへ出力した後、S3 へアップロードする。
+- メンテナンス時: `status: "maintenance"` を含む部分的な JSON も、通常の成功結果として同様に保存する。
+- 失敗時: S3 アップロード失敗時は、それまでの stdout/ファイル出力は残したままコマンドは終了コード 1 になる。不足環境変数は取得前の構築時に検出されエラーになる。
+
+### 4.5 スキーマバージョニング
 
 - `schema_version` は 1 始まりの整数。現在のバージョンは **1**（実装上の単一の定数 `sbi.CurrentSchemaVersion`）。書き出し時に必ず付与されるため、stdout 出力・ファイル出力のどちらでも常に先頭キーとして現れる。
 - **バージョンを上げる（破壊的変更）**: フィールドの削除・リネーム、フィールドの型変更、既存フィールドの値の意味変更など、旧バージョンを前提とした取り込み処理が壊れる変更。
