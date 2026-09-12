@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": "2026-09-12",
   "fetched_at": "2026-08-16T12:00:00Z",
   "status": "ok",
   "nisa": {
@@ -20,6 +20,7 @@
       "prev_month_pct": 8.7,
       "holdings": [
         {
+          "composite_figi": "BBGTESTDOMESTIC",
           "name": "ダミー銘柄A",
           "quantity": 100,
           "unit_cost": 800,
@@ -42,6 +43,7 @@
       "prev_month_pct": 17.65,
       "holdings": [
         {
+          "composite_figi": "BBGTESTUS",
           "name": "ダミー米国株",
           "quantity": 10,
           "unit_cost": 100,
@@ -64,6 +66,7 @@
       "prev_month_pct": 2.39,
       "holdings": [
         {
+          "composite_figi": "BBGTESTFUND",
           "name": "ダミー投信",
           "quantity": 100000,
           "unit_cost": 2000,
@@ -85,6 +88,7 @@
     "pnl_pct": 166.67,
     "funds": [
       {
+        "composite_figi": "BBGTESTOLDFUND",
         "name": "ダミー投信(旧)",
         "quantity": 150000,
         "unit_cost": 1000,

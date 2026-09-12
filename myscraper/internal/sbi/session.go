@@ -17,6 +17,8 @@ type Session interface {
 	Goto(ctx context.Context, url string) error
 	// BodyText returns the trimmed innerText of the document body.
 	BodyText(ctx context.Context) (string, error)
+	// BodyHTML returns the rendered HTML of the current page.
+	BodyHTML(ctx context.Context) (string, error)
 	Wait(ctx context.Context, d time.Duration) error
 	Close() error
 }

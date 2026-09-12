@@ -34,7 +34,7 @@ func (r sbiRunner) RunAssets(ctx context.Context, opts sbi.FetchOptions) error {
 		return fmt.Errorf("passkey login: %w", err)
 	}
 	r.logger.Info("login succeeded, fetching assets")
-	assets, err := sbi.FetchAssets(ctx, sess, opts.Now)
+	assets, err := sbi.FetchAssets(ctx, sess, opts.Now, sbi.NewOpenFIGIResolver(nil))
 	if err != nil {
 		return fmt.Errorf("fetch assets: %w", err)
 	}

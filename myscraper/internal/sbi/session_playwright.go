@@ -111,11 +111,11 @@ func (s *PlaywrightSession) LoginWithPasskey(ctx context.Context, passkey *Passk
 	}
 	created, err := cdp.Send("WebAuthn.addVirtualAuthenticator", map[string]interface{}{
 		"options": map[string]interface{}{
-			"protocol":             "ctap2",
-			"transport":            "internal",
-			"hasResidentKey":       true,
-			"hasUserVerification":  true,
-			"isUserVerified":       true,
+			"protocol":            "ctap2",
+			"transport":           "internal",
+			"hasResidentKey":      true,
+			"hasUserVerification": true,
+			"isUserVerified":      true,
 		},
 	})
 	if err != nil {
@@ -194,6 +194,14 @@ func (s *PlaywrightSession) BodyText(_ context.Context) (string, error) {
 		return "", fmt.Errorf("read body text: %w", err)
 	}
 	return text, nil
+}
+
+func (s *PlaywrightSession) BodyHTML(_ context.Context) (string, error) {
+	html, err := s.page.Content()
+	if err != nil {
+		return "", fmt.Errorf("read page html: %w", err)
+	}
+	return html, nil
 }
 
 func (s *PlaywrightSession) Wait(_ context.Context, d time.Duration) error {

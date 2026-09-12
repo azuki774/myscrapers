@@ -10,6 +10,12 @@ import (
 	"time"
 )
 
+func TestCurrentSchemaVersionIsCalendarDate(t *testing.T) {
+	if _, err := time.Parse("2006-01-02", CurrentSchemaVersion); err != nil {
+		t.Fatalf("CurrentSchemaVersion = %q is not YYYY-MM-DD: %v", CurrentSchemaVersion, err)
+	}
+}
+
 func TestParseAmount(t *testing.T) {
 	tests := []struct {
 		in   string
@@ -272,7 +278,8 @@ func TestAssetsCashOthersShape(t *testing.T) {
 		domesticSummaryURL: cashFixture,
 		foreignSummaryURL:  foreignCashFixture,
 	}}
-	assets, err := FetchAssets(context.Background(), sess, time.Now())
+	sess.htmls = map[string]string{portfolioURL: portfolioHTMLFixture}
+	assets, err := FetchAssets(context.Background(), sess, time.Now(), staticFIGIResolver{})
 	if err != nil {
 		t.Fatalf("FetchAssets: %v", err)
 	}
@@ -364,7 +371,7 @@ func TestExampleAssetsJSON(t *testing.T) {
 		t.Errorf("status = %q, want %q", assets.Status, StatusOK)
 	}
 	if assets.SchemaVersion != CurrentSchemaVersion {
-		t.Errorf("schema_version = %d, want %d", assets.SchemaVersion, CurrentSchemaVersion)
+		t.Errorf("schema_version = %s, want %s", assets.SchemaVersion, CurrentSchemaVersion)
 	}
 
 	// Sections sum to grand total (MECE).
@@ -402,12 +409,12 @@ func TestExampleAssetsJSON(t *testing.T) {
 		assets.NISA.Domestic.Holdings...),
 		assets.NISA.USStocks.Holdings...),
 		assets.NISA.Funds.Holdings...) {
-		if h.Name == "" || h.ValueJPY <= 0 {
+		if h.Name == "" || h.ValueJPY <= 0 || h.CompositeFIGI == "" {
 			t.Errorf("invalid holding: %+v", h)
 		}
 	}
 	for _, h := range assets.OldNISA.Funds {
-		if h.Name == "" || h.ValueJPY <= 0 {
+		if h.Name == "" || h.ValueJPY <= 0 || h.CompositeFIGI == "" {
 			t.Errorf("invalid old_nisa holding: %+v", h)
 		}
 	}
