@@ -63,14 +63,14 @@ const (
 // the previous version (field removal/rename, type change, or a
 // changed meaning of an existing value). Additive changes that
 // consumers can safely ignore do not bump it.
-const CurrentSchemaVersion = 1
+const CurrentSchemaVersion = "2026-09-12"
 
 // Assets is the consolidated, MECE result of a full scrape. Every JPY
 // figure is accounted for exactly once across nisa / old_nisa / other,
 // so grand_total_jpy is the plain sum of the sections. Status records
 // whether the fetch completed normally or hit an SBI maintenance page.
 type Assets struct {
-	SchemaVersion int          `json:"schema_version"`
+	SchemaVersion string       `json:"schema_version"`
 	FetchedAt     time.Time    `json:"fetched_at"`
 	Status        string       `json:"status"`
 	NISA          NISA         `json:"nisa"`
@@ -135,15 +135,17 @@ type NISAItem struct {
 // stocks the per-unit figures are in USD while P&L and value are in JPY
 // (prev-day figures are unavailable for US stocks).
 type Holding struct {
-	Name       string  `json:"name"`
-	Quantity   float64 `json:"quantity"`
-	UnitCost   float64 `json:"unit_cost"`
-	UnitPrice  float64 `json:"unit_price"`
-	PrevDayJPY float64 `json:"prev_day_jpy"`
-	PrevDayPct float64 `json:"prev_day_pct"`
-	PnLJPY     float64 `json:"pnl_jpy"`
-	PnLPct     float64 `json:"pnl_pct"`
-	ValueJPY   float64 `json:"value_jpy"`
+	CompositeFIGI string  `json:"composite_figi"`
+	Name          string  `json:"name"`
+	Quantity      float64 `json:"quantity"`
+	UnitCost      float64 `json:"unit_cost"`
+	UnitPrice     float64 `json:"unit_price"`
+	PrevDayJPY    float64 `json:"prev_day_jpy"`
+	PrevDayPct    float64 `json:"prev_day_pct"`
+	PnLJPY        float64 `json:"pnl_jpy"`
+	PnLPct        float64 `json:"pnl_pct"`
+	ValueJPY      float64 `json:"value_jpy"`
+	source        *FIGILookup
 }
 
 // OldNISA is the 旧つみたてNISA 投資信託 holdings. SBI offers no
@@ -159,11 +161,15 @@ type OldNISA struct {
 	Funds      []Holding `json:"funds"`
 }
 
-// FetchAssets scrapes the four fixed pages and returns the
-// consolidated asset summary. The sections are mutually exclusive and
-// collectively exhaustive: nisa (new NISA), old_nisa (旧つみたてNISA),
-// and other (cash + 特定預り投信 + USD deposit).
-func FetchAssets(ctx context.Context, sess Session, now time.Time) (*Assets, error) {
+// FetchAssets scrapes the four fixed pages and returns the consolidated asset
+// summary after resolving all holding identifiers through the supplied
+// resolver. The sections are mutually exclusive and collectively exhaustive:
+// nisa (new NISA), old_nisa (旧つみたてNISA), and other (cash + 特定預り投信
+// + USD deposit).
+func FetchAssets(ctx context.Context, sess Session, now time.Time, resolver FIGIResolver) (*Assets, error) {
+	if resolver == nil {
+		return nil, fmt.Errorf("FIGI resolver is required")
+	}
 	status := StatusOK
 	// 1. Portfolio page: 旧つみたてNISA and 特定預り 投資信託 sections,
 	// plus the NISA 国内株式 / NISA 投信 holding rows.
@@ -185,9 +191,23 @@ func FetchAssets(ctx context.Context, sess Session, now time.Time) (*Assets, err
 	if err != nil {
 		return nil, fmt.Errorf("parse 特定預り: %w", err)
 	}
+	portfolioHTML, err := sess.BodyHTML(ctx)
+	if err != nil {
+		return nil, err
+	}
 	portfolioTokens := strings.Fields(portfolioText)
-	domesticHoldings := parseStockRows(sectionTokens(portfolioTokens, "株式（現物/NISA預り（成長投資枠））"))
-	fundHoldings := parseFundRows(sectionTokens(portfolioTokens, "投資信託（金額/NISA預り（つみたて投資枠））"))
+	domesticHoldings, err := parseStockRowsStrict(sectionTokens(portfolioTokens, "株式（現物/NISA預り（成長投資枠））"))
+	if err != nil {
+		return nil, fmt.Errorf("parse domestic holdings: %w", err)
+	}
+	fundHoldings, err := parseFundRowsStrict(sectionTokens(portfolioTokens, "投資信託（金額/NISA預り（つみたて投資枠））"), portfolioHTML)
+	if err != nil {
+		return nil, fmt.Errorf("parse nisa funds: %w", err)
+	}
+	oldNisa.Funds, err = parseFundRowsStrict(sectionTokens(portfolioTokens, "投資信託（金額/旧つみたてNISA預り）"), portfolioHTML)
+	if err != nil {
+		return nil, fmt.Errorf("parse old nisa funds: %w", err)
+	}
 
 	// 2. NISA portfolio page (total balance, prev-day/prev-month/P&L).
 	if err := sess.Goto(ctx, nisaPortfolioURL); err != nil {
@@ -224,7 +244,10 @@ func FetchAssets(ctx context.Context, sess Session, now time.Time) (*Assets, err
 	if err != nil {
 		return nil, err
 	}
-	nisa.USStocks.Holdings = parseUSHoldings(assetsText)
+	nisa.USStocks.Holdings, err = parseUSHoldingsStrict(assetsText)
+	if err != nil {
+		return nil, fmt.Errorf("parse US holdings: %w", err)
+	}
 
 	// 4. Domestic 口座サマリー page (現金残高等).
 	if err := sess.Goto(ctx, domesticSummaryURL); err != nil {
@@ -272,7 +295,48 @@ func FetchAssets(ctx context.Context, sess Session, now time.Time) (*Assets, err
 		},
 	}
 	assets.GrandTotalJPY = nisa.TotalJPY + oldNisa.TotalJPY + cash + otherFunds + usdCash.ValueJPY
+	if err := resolveHoldingFIGIs(ctx, assets, resolver); err != nil {
+		return nil, err
+	}
 	return assets, nil
+}
+
+func resolveHoldingFIGIs(ctx context.Context, assets *Assets, resolver FIGIResolver) error {
+	var holdings []*Holding
+	for i := range assets.NISA.Domestic.Holdings {
+		holdings = append(holdings, &assets.NISA.Domestic.Holdings[i])
+	}
+	for i := range assets.NISA.USStocks.Holdings {
+		holdings = append(holdings, &assets.NISA.USStocks.Holdings[i])
+	}
+	for i := range assets.NISA.Funds.Holdings {
+		holdings = append(holdings, &assets.NISA.Funds.Holdings[i])
+	}
+	for i := range assets.OldNISA.Funds {
+		holdings = append(holdings, &assets.OldNISA.Funds[i])
+	}
+	lookups := make([]FIGILookup, 0, len(holdings))
+	for _, holding := range holdings {
+		if holding.source == nil {
+			return fmt.Errorf("holding %q has no FIGI source identifier", holding.Name)
+		}
+		lookups = append(lookups, *holding.source)
+	}
+	if len(lookups) == 0 {
+		return nil
+	}
+	resolved, err := resolver.Resolve(ctx, lookups)
+	if err != nil {
+		return fmt.Errorf("resolve FIGIs: %w", err)
+	}
+	for _, holding := range holdings {
+		figi := resolved[*holding.source]
+		if figi == "" {
+			return fmt.Errorf("no composite FIGI for holding %q", holding.Name)
+		}
+		holding.CompositeFIGI = figi
+	}
+	return nil
 }
 
 // amountRe matches the first numeric token in strings like
@@ -472,6 +536,7 @@ func parseStockRows(tokens []string) []Holding {
 			PnLJPY:     parse(vals[5]),
 			PnLPct:     parse(vals[6]),
 			ValueJPY:   parse(vals[7]),
+			source:     &FIGILookup{Ticker: tokens[i+3], ExchCode: "JP"},
 		})
 		i = dateIdx + 1 + valueCount + 1 // skip 詳細
 	}
@@ -516,6 +581,7 @@ func parseUSHoldings(text string) []Holding {
 			UnitPrice: parse(tokens[i-5]),  // price USD
 			ValueJPY:  parse(tokens[i+11]), // value JPY
 			PnLJPY:    parse(tokens[i+15]), // pnl JPY
+			source:    &FIGILookup{Ticker: tickerFromUSToken(tokens[i-6]), ExchCode: "US"},
 		})
 		i += 17
 	}

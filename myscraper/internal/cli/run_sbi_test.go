@@ -63,7 +63,7 @@ func TestWriteAssetsJSONStampsSchemaVersion(t *testing.T) {
 	if !bytes.Equal(raw, []byte(out)) {
 		t.Fatalf("returned bytes differ from written output")
 	}
-	wantPrefix := "{\n  \"schema_version\": 1,"
+	wantPrefix := "{\n  \"schema_version\": \"2026-09-12\","
 	if !strings.HasPrefix(out, wantPrefix) {
 		t.Fatalf("output does not start with %q:\n%s", wantPrefix, out)
 	}
@@ -71,8 +71,8 @@ func TestWriteAssetsJSONStampsSchemaVersion(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &m); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
-	if got, ok := m["schema_version"].(float64); !ok || got != float64(sbi.CurrentSchemaVersion) {
-		t.Errorf("schema_version = %v, want %d", m["schema_version"], sbi.CurrentSchemaVersion)
+	if got, ok := m["schema_version"].(string); !ok || got != sbi.CurrentSchemaVersion {
+		t.Errorf("schema_version = %v, want %s", m["schema_version"], sbi.CurrentSchemaVersion)
 	}
 }
 
@@ -274,7 +274,7 @@ func (f *fakeS3Client) KeyForTime(now time.Time) string {
 
 func TestUploadAssetsJSONUsesSameBytes(t *testing.T) {
 	client := &fakeS3Client{}
-	raw := []byte("{\"schema_version\":1,\"status\":\"ok\"}\n")
+	raw := []byte("{\"schema_version\":\"2026-09-12\",\"status\":\"ok\"}\n")
 	now := time.Date(2024, 12, 9, 1, 2, 3, 0, time.UTC)
 
 	key, err := UploadAssetsJSON(context.Background(), client, now, raw)

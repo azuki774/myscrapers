@@ -2,6 +2,7 @@ package sbi
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 )
@@ -81,7 +82,8 @@ NISA資産残高
 6円
 0.20%`
 
-	foreignHoldingsFixture = `サンプル米国株 SAMPLEX 100.00 USD 10,000 円 5 (0) 90.00 USD 9,000 円 450.00 USD 45,000 円 500.00 USD 50,000 円 +50.00 USD +5,000 円 現買 現売 積立`
+	foreignHoldingsFixture = `サンプル米国株 SAMPLEXNASDAQ 100.00 USD 10,000 円 5 (0) 90.00 USD 9,000 円 450.00 USD 45,000 円 500.00 USD 50,000 円 +50.00 USD +5,000 円 現買 現売 積立`
+	portfolioHTMLFixture   = `<table><tr><td>サンプルファンド</td><td><a href="/fund?fund_sec_code=1234ABCD">詳細</a></td></tr><tr><td>サンプル投信</td><td><a href="/fund?fund_sec_code=5678EFGH">詳細</a></td></tr></table>`
 
 	foreignCashFixture = `保有資産評価
 預り金
@@ -159,6 +161,7 @@ NISAサービスはメンテナンスのため、サービスのご利用がで�
 // FetchAssets orchestration can be exercised without a browser.
 type fakeSession struct {
 	bodies map[string]string
+	htmls  map[string]string
 	last   string
 }
 
@@ -170,8 +173,27 @@ func (f *fakeSession) Goto(_ context.Context, url string) error {
 func (f *fakeSession) BodyText(context.Context) (string, error) {
 	return f.bodies[f.last], nil
 }
+func (f *fakeSession) BodyHTML(context.Context) (string, error) {
+	return f.htmls[f.last], nil
+}
 func (f *fakeSession) Wait(context.Context, time.Duration) error { return nil }
 func (f *fakeSession) Close() error                              { return nil }
+
+type staticFIGIResolver struct{}
+
+func (staticFIGIResolver) Resolve(_ context.Context, lookups []FIGILookup) (map[FIGILookup]string, error) {
+	result := make(map[FIGILookup]string, len(lookups))
+	for i, lookup := range lookups {
+		result[lookup] = "BBGTEST" + string(rune('A'+i))
+	}
+	return result, nil
+}
+
+type failingFIGIResolver struct{}
+
+func (failingFIGIResolver) Resolve(context.Context, []FIGILookup) (map[FIGILookup]string, error) {
+	return nil, errors.New("OpenFIGI unavailable")
+}
 
 // TestFetchAssetsMaintenanceStatus verifies that when the NISA page is
 // an SBI maintenance page, FetchAssets returns an Assets with
@@ -184,8 +206,8 @@ func TestFetchAssetsMaintenanceStatus(t *testing.T) {
 		foreignAssetsURL:   foreignHoldingsFixture,
 		domesticSummaryURL: cashFixture,
 		foreignSummaryURL:  foreignCashFixture,
-	}}
-	assets, err := FetchAssets(context.Background(), sess, time.Now())
+	}, htmls: map[string]string{portfolioURL: portfolioHTMLFixture}}
+	assets, err := FetchAssets(context.Background(), sess, time.Now(), staticFIGIResolver{})
 	if err != nil {
 		t.Fatalf("FetchAssets: %v", err)
 	}
@@ -212,8 +234,8 @@ func TestFetchAssetsOKStatus(t *testing.T) {
 		foreignAssetsURL:   foreignHoldingsFixture,
 		domesticSummaryURL: cashFixture,
 		foreignSummaryURL:  foreignCashFixture,
-	}}
-	assets, err := FetchAssets(context.Background(), sess, time.Now())
+	}, htmls: map[string]string{portfolioURL: portfolioHTMLFixture}}
+	assets, err := FetchAssets(context.Background(), sess, time.Now(), staticFIGIResolver{})
 	if err != nil {
 		t.Fatalf("FetchAssets: %v", err)
 	}
@@ -222,5 +244,24 @@ func TestFetchAssetsOKStatus(t *testing.T) {
 	}
 	if assets.NISA.TotalJPY != 10000 {
 		t.Errorf("NISA.TotalJPY = %v", assets.NISA.TotalJPY)
+	}
+	for _, holding := range append(append(assets.NISA.Funds.Holdings, assets.OldNISA.Funds...), assets.NISA.USStocks.Holdings...) {
+		if holding.CompositeFIGI == "" {
+			t.Errorf("holding %q has empty composite FIGI", holding.Name)
+		}
+	}
+}
+
+func TestFetchAssetsFIGIResolverFailureReturnsNoAssets(t *testing.T) {
+	sess := &fakeSession{bodies: map[string]string{
+		portfolioURL:       portfolioFixture,
+		nisaPortfolioURL:   nisaFixture,
+		foreignAssetsURL:   foreignHoldingsFixture,
+		domesticSummaryURL: cashFixture,
+		foreignSummaryURL:  foreignCashFixture,
+	}, htmls: map[string]string{portfolioURL: portfolioHTMLFixture}}
+	assets, err := FetchAssets(context.Background(), sess, time.Now(), failingFIGIResolver{})
+	if err == nil || assets != nil {
+		t.Fatalf("assets=%#v err=%v, want nil assets and resolver error", assets, err)
 	}
 }
