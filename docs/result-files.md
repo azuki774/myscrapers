@@ -174,12 +174,6 @@ S3 から cookie ファイルをダウンロードしてローカルに保存す
 | `amount` | 自通貨建ての数量（JPY エントリなら円、USD エントリなら米ドル） |
 | `value_jpy` | 円換算評価額。JPY エントリでは `amount` と同値になる |
 
-銘柄明細には次の識別子フィールドもあります。
-
-| フィールド | 内容 |
-|---|---|
-| `composite_figi` | OpenFIGI の composite FIGI。すべての `holdings[]` / `old_nisa.funds[]` で必須。SBI の照合元コードは出力しない |
-
 取り込み側は条件分岐なしにすべての `value_jpy` を合計すればよい。
 
 `grand_total_jpy` の計算式（MECE: 重複なし・漏れなし）:
@@ -220,6 +214,7 @@ grand_total_jpy =
 | `prev_day_jpy`, `prev_day_pct` | 前日比（円/%）。米国株式には前日比情報が無いため 0 になる |
 | `pnl_jpy`, `pnl_pct` | 評価損益（円 / %。株・投信は円建て、米国株式の P&L は円換算） |
 | `value_jpy` | 評価額（円） |
+| `composite_figi` | OpenFIGI の composite FIGI。必須。SBI の照合元コードは出力しない |
 
 ### 4.2 `old_nisa` 詳細
 
