@@ -2,8 +2,9 @@
 
 ## Container images
 
-The `v*` release workflow publishes both images for `linux/amd64` and
-`linux/arm64` with semver tags and `latest`:
+The `v*` release workflow publishes both images for `linux/amd64` with semver
+tags and `latest`. Arm64 publishing is temporarily suspended because the
+additional build time is too high:
 
 - `ghcr.io/azuki774/myscrapers-mf`
 - `ghcr.io/azuki774/myscrapers-sbi`
