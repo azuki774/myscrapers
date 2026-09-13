@@ -560,7 +560,7 @@ func parseUSHoldings(text string) []Holding {
 			i++
 			continue
 		}
-		if i+16 >= len(tokens) || i-5 < 0 {
+		if i+16 >= len(tokens) || i-6 < 0 {
 			break
 		}
 		parse := func(s string) float64 {
@@ -581,7 +581,7 @@ func parseUSHoldings(text string) []Holding {
 			UnitPrice: parse(tokens[i-5]),  // price USD
 			ValueJPY:  parse(tokens[i+11]), // value JPY
 			PnLJPY:    parse(tokens[i+15]), // pnl JPY
-			source:    &FIGILookup{Ticker: tickerFromUSToken(tokens[i-6]), ExchCode: "US"},
+			source:    &FIGILookup{Ticker: tickerFromUSTokens(tokens[rowStart : i-5]), ExchCode: "US"},
 		})
 		i += 17
 	}

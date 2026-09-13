@@ -50,7 +50,7 @@ go run ./cmd/myscraper sbi --s3-upload
 - `status: "maintenance"` を含む部分的な JSON も、FIGI を解決できた場合は通常の成功結果として同様に保存します。
 - パスキーのダウンロード失敗・検証失敗、または結果の S3 アップロード失敗時は、コマンドは終了コード 1 になります。
 
-銘柄明細には `composite_figi`（OpenFIGI の composite FIGI）を必ず含めます。国内株・ETF は SBI の 4 文字証券コード、米国株は ticker と市場、投資信託は保有一覧 HTML の `fund_sec_code` を照合元として OpenFIGI に問い合わせます。照合できない銘柄がある場合は JSON を出力せず、取得を失敗扱いにします。照合元の SBI 固有コードは JSON には出力しません。
+銘柄明細には `composite_figi`（OpenFIGI の composite FIGI）を必ず含めます。国内株・ETF は SBI の 4 文字証券コード、米国株は ticker と市場、投資信託は保有一覧 HTML の銘柄リンク（`path=fund/detail/<code>` または `fund_sec_code`） を照合元として OpenFIGI に問い合わせます。照合できない銘柄がある場合は JSON を出力せず、取得を失敗扱いにします。照合元の SBI 固有コードは JSON には出力しません。
 
 ローカルでの実行（S3 を使わない）の場合は、パスキーの指定は `--passkey` フラグが最優先で、省略時は環境変数 `SBI_PASSKEY_PATH`、それも無ければデフォルト `~/.local/state/opencode/sbi-passkey.json` を使います:
 

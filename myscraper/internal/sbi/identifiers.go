@@ -54,6 +54,17 @@ func parseUSHoldingsStrict(text string) ([]Holding, error) {
 	return holdings, nil
 }
 
+// tickerFromUSTokens accepts market labels split by rendered whitespace,
+// including "XLRENYSE Arca" and "XLRE NYSE Arca".
+func tickerFromUSTokens(tokens []string) string {
+	for count := 1; count <= 3 && count <= len(tokens); count++ {
+		if ticker := tickerFromUSToken(strings.Join(tokens[len(tokens)-count:], " ")); ticker != "" {
+			return ticker
+		}
+	}
+	return ""
+}
+
 func tickerFromUSToken(token string) string {
 	markets := []string{"NYSEAMERICAN", "NYSEARCA", "NASDAQ", "NYSE", "CBOE", "OTC"}
 	for _, market := range markets {
@@ -91,7 +102,7 @@ type fundHTMLCandidate struct {
 	code string
 }
 
-// parseFundRowsStrict attaches fund_sec_code values from rendered portfolio
+// parseFundRowsStrict attaches fund security codes from rendered portfolio
 // HTML. Matching is by normalized holding name and must yield one code.
 func parseFundRowsStrict(tokens []string, pageHTML string) ([]Holding, error) {
 	funds := parseFundRows(tokens)
@@ -120,7 +131,7 @@ func parseFundRowsStrict(tokens []string, pageHTML string) ([]Holding, error) {
 			}
 		}
 		if len(codes) != 1 {
-			return nil, fmt.Errorf("fund %q matched %d fund_sec_code values", funds[i].Name, len(codes))
+			return nil, fmt.Errorf("fund %q matched %d fund security codes", funds[i].Name, len(codes))
 		}
 		for code := range codes {
 			funds[i].source = &FIGILookup{Ticker: strings.ToUpper(code), ExchCode: "JP"}
@@ -169,7 +180,6 @@ func fundHTMLCandidates(pageHTML string) ([]fundHTMLCandidate, error) {
 			for _, code := range linksWithFundCode(node) {
 				candidates = append(candidates, fundHTMLCandidate{name: text, code: code})
 			}
-			return
 		}
 		for child := node.FirstChild; child != nil; child = child.NextSibling {
 			walk(child)
@@ -196,6 +206,10 @@ func linksWithFundCode(node *html.Node) []string {
 	var codes []string
 	var walk func(*html.Node)
 	walk = func(n *html.Node) {
+		// Nested table rows belong to separate holdings.
+		if n != node && n.Type == html.ElementNode && n.Data == "tr" {
+			return
+		}
 		if n.Type == html.ElementNode && n.Data == "a" {
 			for _, attr := range n.Attr {
 				if attr.Key != "href" {
@@ -205,7 +219,15 @@ func linksWithFundCode(node *html.Node) []string {
 				if err != nil {
 					continue
 				}
-				code := u.Query().Get("fund_sec_code")
+				query := u.Query()
+				code := query.Get("fund_sec_code")
+				if code == "" {
+					// SBI portfolio links encode the fund identifier in the
+					// ETGate path parameter, e.g. fund%2Fdetail%2F1234ABCD.
+					if suffix, ok := strings.CutPrefix(query.Get("path"), "fund/detail/"); ok {
+						code = suffix
+					}
+				}
 				if fundSecurityCodeRe.MatchString(code) {
 					if _, ok := seen[code]; !ok {
 						seen[code] = struct{}{}

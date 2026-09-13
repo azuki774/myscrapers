@@ -189,3 +189,43 @@ func TestOpenFIGIClientRetriesAndExhausts5xx(t *testing.T) {
 		t.Fatalf("attempts=%d delays=%v", attempts, delays)
 	}
 }
+
+func TestParseFundRowsStrictNestedETGateRows(t *testing.T) {
+	tokens := strings.Fields("積立 売却 ABC ファンド --/--/-- 1 2 3 4 5 6 7 8 詳細 積立 売却 XYZ ファンド --/--/-- 1 2 3 4 5 6 7 8 詳細")
+	page := `<table><tr><td><table>
+ <tr><td><a href="/ETGate/?_ActionID=NoActionID&amp;path=fund%2Fdetail%2F1234ABCD">ＡＢＣ　ファンド</a></td></tr>
+ <tr><td><a href="/ETGate/?path=fund%2Fdetail%2F5678EFGH">ＸＹＺ　ファンド</a></td></tr>
+ </table></td></tr></table>`
+	holdings, err := parseFundRowsStrict(tokens, page)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, want := range []string{"1234ABCD", "5678EFGH"} {
+		if got := holdings[i].source; got == nil || got.Ticker != want {
+			t.Fatalf("holding %d source = %+v, want %s", i, got, want)
+		}
+	}
+}
+
+func TestParseFundRowsStrictRejectsInvalidETGatePaths(t *testing.T) {
+	tokens := strings.Fields("積立 売却 ABCファンド --/--/-- 1 2 3 4 5 6 7 8 詳細")
+	for _, path := range []string{"1234ABCD", "stock/detail/1234ABCD", "fund/detail/1234", "fund/detail/1234ABCD/extra"} {
+		page := `<table><tr><td><a href="/ETGate/?path=` + path + `">ABCファンド</a></td></tr></table>`
+		if _, err := parseFundRowsStrict(tokens, page); err == nil {
+			t.Errorf("accepted invalid path %q", path)
+		}
+	}
+}
+
+func TestParseUSHoldingsStrictSplitMarket(t *testing.T) {
+	for _, symbol := range []string{"XLRENYSE Arca", "XLRE NYSE Arca", "XLRENYSEArca"} {
+		text := "取引 サンプル ETF " + symbol + " 10 USD 1500 円 2 (0) 8 USD 1200 円 16 USD 2400 円 20 USD 3000 円 +4 USD +600 円 現買 現売 積立"
+		holdings, err := parseUSHoldingsStrict(text)
+		if err != nil {
+			t.Fatalf("%s: %v", symbol, err)
+		}
+		if len(holdings) != 1 || holdings[0].source.Ticker != "XLRE" || holdings[0].Quantity != 2 || holdings[0].UnitPrice != 10 || holdings[0].ValueJPY != 3000 {
+			t.Fatalf("%s: unexpected holding: %+v", symbol, holdings)
+		}
+	}
+}
