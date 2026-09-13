@@ -1,5 +1,17 @@
 # myscrapers
 
+## Container images
+
+The `v*` release workflow publishes both images for `linux/amd64` and
+`linux/arm64` with semver tags and `latest`:
+
+- `ghcr.io/azuki774/myscrapers-mf`
+- `ghcr.io/azuki774/myscrapers-sbi`
+
+Pushes to `master` publish both images with the first seven characters of the
+commit SHA as the tag (for example, `a1b2c3d`). These pushes do not update
+`latest`. Pushes to other branches build the images without publishing them.
+
 ## myscraper (Go)
 
 Go ベースの scraper 実装は `myscraper/` 配下にある。
