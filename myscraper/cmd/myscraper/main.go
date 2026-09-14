@@ -34,6 +34,10 @@ func main() {
 			sbiRunner{logger: logger, stdout: os.Stdout},
 		))
 	}
+	if len(os.Args) > 1 && os.Args[1] == "nrkn" {
+		logger := slog.New(slog.NewJSONHandler(os.Stderr, nil))
+		os.Exit(cli.RunNRKN(os.Args[1:], os.Stdout, os.Stderr, logger, nrknRunner{logger: logger, stdout: os.Stdout}))
+	}
 	os.Exit(cli.Run(
 		os.Args[1:],
 		os.Stdout,

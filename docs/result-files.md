@@ -16,6 +16,44 @@
 
 ## 共通仕様
 
+### NRKN 日次スナップショット
+
+`myscraper nrkn [--output FILE] [--s3-upload]` は現在の合計タブを1回取得する。
+出力はUTF-8、2スペースインデント、末尾LFのJSON。ファイル指定がなければstdout、
+指定時は0600で原子的に保存する。ログはstderrへ出力する。
+`--output` > `NRKN_OUTPUT` の順で出力先を選択する。
+S3指定時は同じバイト列を `<BUCKET_DIR>/YYYY/MM/YYYYMMDD-HHMMSS.json`（JST）へ保存する。
+
+| トップレベル | 意味 |
+|---|---|
+| `schema_version` | 日付形式のスキーマバージョン |
+| `fetched_at` | 取得実行時刻（RFC3339） |
+| `status` | 成功時 `ok` |
+| `grand_total_jpy` | 商品明細下の資産評価額合計 |
+| `total_cost_jpy` | 商品明細下の取得価額累計合計 |
+| `pnl_jpy` | 商品明細下の損益合計 |
+| `holdings` | 全商品明細の配列 |
+
+| 商品別フィールド | 意味 |
+|---|---|
+| `product_code` | NRKN商品コード。文字列として先頭ゼロを保持 |
+| `name`, `category` | 商品名、商品分類 |
+| `quantity` | 数量（残高） |
+| `unit_price`, `value_jpy`, `cost_jpy` | 基準価額、資産評価額、取得価額累計 |
+| `redemption_unit_price`, `redemption_value_jpy` | 解約価額、解約時評価額 |
+| `pnl_jpy` | 損益 |
+| `reference_date` | 商品基準日（YYYY-MM-DD）。取得日とは区別する |
+| `allocation_pct` | 表示された構成比。34％なら数値34 |
+| `unit_price_raw`, `redemption_unit_price_raw` | 価格の元表記。特殊記号を保持 |
+
+金額・数量・比率は数値。評価額は画面値を保存し、数量と価格から算出しない。
+価格先頭の `*` は単位数量が通常の10,000と異なる表示として保持する。
+拠出金額累計と取得価額累計は別概念のため、後者は必ず商品明細下の合計欄から取得する。
+グラフの「その他」集約や凡例を明細として読み込まない。
+取得対象は現在の合計タブのみ。各日実行することで履歴を蓄積する。
+認証・解析・メンテナンスの失敗をゼロ残高として保存しない。
+ログアウト後処理に失敗した場合、取得済みJSONを保持して非ゼロ終了する。
+
 - **文字エンコーディング**: 全結果ファイルとも UTF-8（BOM なし）。
   - 注: Go 実装は CSV を Shift-JIS へ変換せず、UTF-8 のまま書き出す。`docs/myscrapers.md` の Shift-JIS 記述は現行実装との乖離がある。
 - **改行コード**: LF。

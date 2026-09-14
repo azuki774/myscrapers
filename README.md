@@ -2,14 +2,15 @@
 
 ## Container images
 
-The `v*` release workflow publishes both images for `linux/amd64` with semver
+The `v*` release workflow publishes all images for `linux/amd64` with semver
 tags and `latest`. Arm64 publishing is temporarily suspended because the
 additional build time is too high:
 
 - `ghcr.io/azuki774/myscrapers-mf`
 - `ghcr.io/azuki774/myscrapers-sbi`
+- `ghcr.io/azuki774/myscrapers-nrkn`
 
-Pushes to `master` publish both images with the first seven characters of the
+Pushes to `master` publish all images with the first seven characters of the
 commit SHA as the tag (for example, `a1b2c3d`). These pushes do not update
 `latest`. Pushes to other branches build the images without publishing them.
 
@@ -27,6 +28,42 @@ go test ./internal/... -v
 PLAYWRIGHT_E2E=1 go test ./e2e -run TestGitHubSmoke -v
 go run ./cmd/myscraper --url https://github.com --out tmp/github.html
 ```
+
+### myscraper nrkn CLI
+
+NRKN の「資産評価額照会 → 合計」から全商品の最新明細を取得します。
+実行環境から `NRKN_ID`、`NRKN_PASS`、`NRKN_BIRTHDAY`（YYYYMMDD）を注入してください。
+認証情報を引数やログに記載しないでください。
+
+```bash
+# 開発環境で実行。出力先ディレクトリは事前に用意する。
+go run ./cmd/myscraper nrkn --output /data/nrkn-assets.json
+# S3設定はSBIと共通。BUCKET_DIRは myscrapers/nrkn を推奨。
+go run ./cmd/myscraper nrkn --s3-upload
+```
+
+`--output`（未指定時 `NRKN_OUTPUT`）がなければ stdout にJSONのみを出力します。
+ログはstderr、ファイルは0600で保存します。S3では実行時刻をJSTに変換した
+`<BUCKET_DIR>/YYYY/MM/YYYYMMDD-HHMMSS.json` に同じ内容を保存します。
+商品コード、名称、分類、数量、基準価額、評価額、取得価額累計、解約価額、
+解約時評価額、損益、基準日、資産比率を収録します。詳細は [結果ファイル仕様](docs/result-files.md) を参照してください。
+架空データの全項目例は [example-assets.json](myscraper/internal/nrkn/testdata/example-assets.json) にあります。
+
+ローカルの模擬ページを使うブラウザテストは、開発環境で
+`NRKN_BROWSER_TEST=1 go test -v ./internal/nrkn -run TestBrowserFlow` を実行します。
+
+日次ジョブの例（cronのタイムゾーンをAsia/Tokyoに設定済みのホスト）:
+
+```cron
+15 7 * * * /usr/bin/flock -n /var/lock/nrkn-assets.lock /usr/bin/docker run --rm --env-file /etc/myscrapers/nrkn.env ghcr.io/azuki774/myscrapers-nrkn:latest
+```
+
+環境変数ファイルは管理者が0600で配置し、NRKN認証情報とS3設定を指定します。
+コンテナの既定コマンドは `nrkn --s3-upload` です。同時実行を避け、失敗後の自動再実行は設定しません。
+休日も取得でき、取得日と商品基準日は異なることがあります。
+ログインは通常1回、同時利用エラー990003の場合だけ同一セッションで追加1回です。
+終了時はログアウトをクリックし、完了を確認します。取得後のログアウト失敗は
+保存済みJSONを保持したまま非ゼロ終了で通知します。
 
 ### myscraper sbi CLI
 

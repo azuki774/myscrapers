@@ -23,6 +23,8 @@ jobs:
             dockerfile: ./build/moneyforward/Dockerfile
           - image: ghcr.io/azuki774/myscrapers-sbi
             dockerfile: ./build/sbi/Dockerfile
+          - image: ghcr.io/azuki774/myscrapers-nrkn
+            dockerfile: ./build/nrkn/Dockerfile
     runs-on: ubuntu-latest
     steps:
       - name: checkout

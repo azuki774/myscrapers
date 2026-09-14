@@ -1,0 +1,26 @@
+{
+  "schema_version": "2026-09-14",
+  "fetched_at": "2026-09-14T06:00:00Z",
+  "status": "ok",
+  "grand_total_jpy": 250000,
+  "total_cost_jpy": 240000,
+  "pnl_jpy": 10000,
+  "holdings": [
+    {
+      "product_code": "09999",
+      "name": "架空国内株式インデックス",
+      "category": "国内投信",
+      "quantity": 200000,
+      "unit_price": 12500,
+      "value_jpy": 250000,
+      "cost_jpy": 240000,
+      "redemption_unit_price": 12400,
+      "redemption_value_jpy": 248000,
+      "pnl_jpy": 10000,
+      "reference_date": "2026-09-11",
+      "allocation_pct": 100,
+      "unit_price_raw": "12,500円",
+      "redemption_unit_price_raw": "12,400円"
+    }
+  ]
+}
