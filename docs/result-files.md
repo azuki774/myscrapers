@@ -37,6 +37,7 @@ S3指定時は同じバイト列を `<BUCKET_DIR>/YYYY/MM/YYYYMMDD-HHMMSS.json`�
 | 商品別フィールド | 意味 |
 |---|---|
 | `product_code` | NRKN商品コード。文字列として先頭ゼロを保持 |
+| `composite_figi` | SBIと共通のOpenFIGIクライアントで照合した識別子。全商品で必須 |
 | `name`, `category` | 商品名、商品分類 |
 | `quantity` | 数量（残高） |
 | `unit_price`, `value_jpy`, `cost_jpy` | 基準価額、資産評価額、取得価額累計 |
@@ -52,6 +53,9 @@ S3指定時は同じバイト列を `<BUCKET_DIR>/YYYY/MM/YYYYMMDD-HHMMSS.json`�
 グラフの「その他」集約や凡例を明細として読み込まない。
 取得対象は現在の合計タブのみ。各日実行することで履歴を蓄積する。
 認証・解析・メンテナンスの失敗をゼロ残高として保存しない。
+FIGIは確認済み商品名に対応する投信協会コードで毎回照合する。対応商品と追加手順は
+[README](../README.md#myscraper-nrkn-cli)を参照。未登録商品・照合失敗・FIGI欠落時は
+新しいJSONの出力・ファイル保存・S3送信を行わず、ログアウトして非ゼロ終了する。
 ログアウト後処理に失敗した場合、取得済みJSONを保持して非ゼロ終了する。
 
 - **文字エンコーディング**: 全結果ファイルとも UTF-8（BOM なし）。

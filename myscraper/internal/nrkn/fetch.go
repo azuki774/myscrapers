@@ -25,6 +25,7 @@ type FetchOptions struct {
 	Logger             *slog.Logger
 	Headless, S3Upload bool
 	S3Client           S3Client
+	FIGIResolver       HoldingFIGIResolver
 }
 type S3Client interface {
 	PutJSON(context.Context, string, io.Reader) error
@@ -41,6 +42,7 @@ type Assets struct {
 	Holdings      []Holding `json:"holdings"`
 }
 type Holding struct {
+	CompositeFIGI          string  `json:"composite_figi"`
 	ProductCode            string  `json:"product_code"`
 	Name                   string  `json:"name"`
 	Category               string  `json:"category"`
@@ -61,6 +63,9 @@ type Holding struct {
 func FetchAssets(ctx context.Context, sess Session, opts FetchOptions) (assets *Assets, retErr error) {
 	if sess == nil {
 		return nil, fmt.Errorf("nrkn: session is required")
+	}
+	if opts.FIGIResolver == nil {
+		return nil, fmt.Errorf("nrkn: FIGI resolver is required")
 	}
 	defer func() {
 		cleanupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -111,6 +116,17 @@ func FetchAssets(ctx context.Context, sess Session, opts FetchOptions) (assets *
 	}
 	if sums != totals && opts.Logger != nil {
 		opts.Logger.Warn("nrkn: displayed totals differ from holding sums; preserving displayed values")
+	}
+	resolved, err := opts.FIGIResolver.Resolve(ctx, holdings)
+	if err != nil {
+		return nil, fmt.Errorf("nrkn: resolve FIGIs: %w", err)
+	}
+	for i := range a.Holdings {
+		figi := strings.TrimSpace(resolved[a.Holdings[i].ProductCode])
+		if figi == "" {
+			return nil, fmt.Errorf("nrkn: missing composite FIGI for product %q", a.Holdings[i].ProductCode)
+		}
+		a.Holdings[i].CompositeFIGI = figi
 	}
 	return a, nil
 }

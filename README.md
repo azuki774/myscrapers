@@ -49,6 +49,26 @@ go run ./cmd/myscraper nrkn --s3-upload
 解約時評価額、損益、基準日、資産比率を収録します。詳細は [結果ファイル仕様](docs/result-files.md) を参照してください。
 架空データの全項目例は [example-assets.json](myscraper/internal/nrkn/testdata/example-assets.json) にあります。
 
+各商品には `composite_figi` を必ず付与します。SBIと共通のOpenFIGIクライアントで、
+投信協会コードを `TICKER`、市場を `JP` として `/v3/mapping` へ問い合わせます。
+APIキー不要、重複を除いて最大10件ずつ送信し、429/5xxのみ最大3回（初回を含む）、
+`Retry-After` に従って再試行します。これはOpenFIGIへの再試行であり、NRKNへの再ログインは増やしません。
+
+NRKNの5桁の商品コードはOpenFIGIへ送信しません。
+[商品識別子一覧](myscraper/internal/nrkn/figi.go)で表示名を投信協会コードに対応付けます。
+全半角・空白・英字大小の違いだけを正規化し、確認済み名称と完全一致させます。
+現時点で登録済みなのはDCニッセイ国内株式インデックス、
+野村外国株式インデックスファンド・MSCI-KOKUSAI（確定拠出年金向け）、
+マイバランス70（確定拠出年金向け）の3商品です。
+出典は[ニッセイの商品情報](https://www.nam.co.jp/fundinfo/dcnkki/main.html)と
+[野村の投信協会コード一覧（3ページ）](https://www.nomura-am.co.jp/news/20160928_1D8BFFA4.pdf)です。
+新しい商品は運用会社の資料でコードとNRKN表示名を確認して一覧・テストへ追加します。
+FIGI自体は固定保存せず毎回問い合わせます。
+
+未登録商品、複数候補、照合不一致、空のFIGI、APIエラーが1件でもあれば、
+SBI同様に新しいJSONを出力・保存・S3送信せず失敗とします（既存ファイルは保持）。
+その場合もログアウトを1回試みます。
+
 ローカルの模擬ページを使うブラウザテストは、開発環境で
 `NRKN_BROWSER_TEST=1 go test -v ./internal/nrkn -run TestBrowserFlow` を実行します。
 

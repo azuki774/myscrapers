@@ -68,10 +68,14 @@ func TestWriteNRKNJSONAtomic0600(t *testing.T) {
 
 func TestUploadNRKNJSONPreservesEmittedBytes(t *testing.T) {
 	var emitted bytes.Buffer
-	a := &nrkn.Assets{FetchedAt: time.Unix(0, 0), Status: nrkn.StatusOK}
+	a := &nrkn.Assets{FetchedAt: time.Unix(0, 0), Status: nrkn.StatusOK,
+		Holdings: []nrkn.Holding{{ProductCode: "09999", CompositeFIGI: "BBGTESTFUND"}}}
 	raw, err := WriteNRKNJSON(&emitted, "", a)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if !bytes.Contains(raw, []byte(`"composite_figi": "BBGTESTFUND"`)) {
+		t.Fatal("emitted JSON is missing composite FIGI")
 	}
 	store := &fakeNRKNS3{key: "nrkn/2026/09/example.json"}
 	key, err := UploadNRKNJSON(context.Background(), store, time.Unix(0, 0), raw)

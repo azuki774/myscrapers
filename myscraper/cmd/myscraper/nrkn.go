@@ -28,6 +28,9 @@ func (r nrknRunner) RunAssets(ctx context.Context, opts nrkn.FetchOptions) error
 	}()
 	fetchCtx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer cancel()
+	if opts.FIGIResolver == nil {
+		opts.FIGIResolver = nrkn.NewHoldingFIGIResolver(nil)
+	}
 	a, fetchErr := nrkn.FetchAssets(fetchCtx, s, opts)
 	if a == nil {
 		return fetchErr

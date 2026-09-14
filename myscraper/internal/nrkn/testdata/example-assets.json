@@ -8,6 +8,7 @@
   "holdings": [
     {
       "product_code": "09999",
+      "composite_figi": "BBGTESTFUND",
       "name": "架空国内株式インデックス",
       "category": "国内投信",
       "quantity": 200000,

@@ -17,6 +17,25 @@ type fakeSession struct {
 	logoutErr                                         error
 }
 
+type fakeHoldingResolver struct {
+	err    error
+	values map[string]string
+}
+
+func (f fakeHoldingResolver) Resolve(_ context.Context, holdings []Holding) (map[string]string, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	if f.values != nil {
+		return f.values, nil
+	}
+	r := make(map[string]string, len(holdings))
+	for _, h := range holdings {
+		r[h.ProductCode] = "FIGI-" + h.ProductCode
+	}
+	return r, nil
+}
+
 func (f *fakeSession) Login(context.Context, string, string, string) error {
 	i := f.loginCalls
 	f.loginCalls++
@@ -31,7 +50,7 @@ func (f *fakeSession) Logout(context.Context) error             { f.logoutCalls+
 func (f *fakeSession) Close() error                             { return nil }
 
 func testOptions() FetchOptions {
-	return FetchOptions{Credentials: Credentials{ID: "id", Password: "pass", Birthday: "20000101"}, Now: time.Unix(0, 0)}
+	return FetchOptions{Credentials: Credentials{ID: "id", Password: "pass", Birthday: "20000101"}, Now: time.Unix(0, 0), FIGIResolver: fakeHoldingResolver{}}
 }
 
 func TestParseHoldingsHTMLMapsJapaneseTableRows(t *testing.T) {
@@ -85,6 +104,60 @@ func TestFetchAssetsCleanupFailureReturnsAssetsAndError(t *testing.T) {
 	a, err := FetchAssets(context.Background(), f, testOptions())
 	if err == nil || a == nil || f.logoutCalls != 1 {
 		t.Fatalf("assets=%v err=%v logout=%d", a, err, f.logoutCalls)
+	}
+}
+
+func resolverFixture() string {
+	return `<div class="infoHdWrap"><dl><dt>商品名</dt><dd>架空</dd><dt>商品コード</dt><dd>06666</dd><dt>商品分類</dt><dd>国内投信</dd></dl></div><table><tr><th>数量（残高）</th><th>基準価額</th><th>資産評価額</th><th>取得価額累計</th></tr><tr><td>1</td><td>100円</td><td>100円</td><td>90円</td></tr><tr><th>解約価額</th><th>解約時評価額</th><th>損益</th></tr><tr><td>100円</td><td>100円</td><td>10円</td></tr><tr><th>基準日</th><th>資産比率</th></tr><tr><td>2026/09/11</td><td>100％</td></tr></table><table><tr><th>資産評価額合計</th><th>取得価額累計合計</th><th>損益合計</th></tr><tr><td>100円</td><td>90円</td><td>10円</td></tr></table>`
+}
+
+func TestFetchAssetsFIGIResolverFailureReturnsNoAssetsAndLogsOut(t *testing.T) {
+	f := &fakeSession{body: resolverFixture()}
+	o := testOptions()
+	o.FIGIResolver = fakeHoldingResolver{err: errors.New("resolver unavailable")}
+	a, err := FetchAssets(context.Background(), f, o)
+	if err == nil || a != nil || f.logoutCalls != 1 {
+		t.Fatalf("assets=%v err=%v logout=%d", a, err, f.logoutCalls)
+	}
+}
+
+func TestFetchAssetsFIGIResolverPartialMapReturnsNoAssets(t *testing.T) {
+	second := strings.ReplaceAll(resolverFixture(), "06666", "05555")
+	second = strings.SplitN(second, "<table><tr><th>資産評価額合計", 2)[0]
+	f := &fakeSession{body: resolverFixture() + second}
+	o := testOptions()
+	o.FIGIResolver = fakeHoldingResolver{values: map[string]string{"06666": "BBGTESTFUND"}}
+	a, err := FetchAssets(context.Background(), f, o)
+	if err == nil || a != nil || f.logoutCalls != 1 {
+		t.Fatalf("assets=%v err=%v logout=%d", a, err, f.logoutCalls)
+	}
+}
+
+func TestFetchAssetsAttachesFIGIToEveryHolding(t *testing.T) {
+	second := strings.ReplaceAll(resolverFixture(), "06666", "05555")
+	second = strings.SplitN(second, "<table><tr><th>資産評価額合計", 2)[0]
+	f := &fakeSession{body: resolverFixture() + second}
+	a, err := FetchAssets(context.Background(), f, testOptions())
+	if err != nil || a == nil {
+		t.Fatalf("fetch failed: %v", err)
+	}
+	if len(a.Holdings) != 2 || f.logoutCalls != 1 {
+		t.Fatalf("holdings=%d logout=%d", len(a.Holdings), f.logoutCalls)
+	}
+	for _, h := range a.Holdings {
+		if h.CompositeFIGI != "FIGI-"+h.ProductCode {
+			t.Fatalf("missing or misplaced FIGI for %s", h.ProductCode)
+		}
+	}
+}
+
+func TestFetchAssetsRequiresFIGIResolverBeforeLogin(t *testing.T) {
+	f := &fakeSession{body: resolverFixture()}
+	o := testOptions()
+	o.FIGIResolver = nil
+	a, err := FetchAssets(context.Background(), f, o)
+	if err == nil || a != nil || f.loginCalls != 0 || f.logoutCalls != 0 {
+		t.Fatalf("assets=%v err=%v login=%d logout=%d", a, err, f.loginCalls, f.logoutCalls)
 	}
 }
 
