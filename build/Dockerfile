@@ -39,7 +39,7 @@ RUN CGO_ENABLED=0 \
 ENV PLAYWRIGHT_DRIVER_PATH=/out/playwright-driver
 RUN go run github.com/mxschmitt/playwright-go/cmd/playwright@v0.6201.0 --version
 
-FROM ${RUNTIME_BASE}
+FROM ${RUNTIME_BASE} AS runtime
 
 # Debian's `chromium` is on PATH and is the first match in
 # myscraper/internal/chromium/exec.go's lookup, so no third-party
@@ -70,4 +70,10 @@ ENV TZ=Asia/Tokyo
 
 USER myscraper
 ENTRYPOINT ["myscraper"]
+
+FROM runtime AS nrkn
 CMD ["nrkn", "--s3-upload"]
+
+# Keep SBI as the default target for builds without --target.
+FROM runtime AS sbi
+CMD ["sbi", "--s3-upload"]

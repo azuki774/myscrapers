@@ -16,7 +16,7 @@ func TestBrowserFlow(t *testing.T) {
 	if os.Getenv("NRKN_BROWSER_TEST") != "1" {
 		t.Skip("set NRKN_BROWSER_TEST=1 to run local Chromium fixture")
 	}
-	for _, scenario := range []string{"success", "concurrent", "bad-login", "logout-stuck", "unexpected-asset"} {
+	for _, scenario := range []string{"success", "different-form-name", "concurrent", "bad-login", "logout-stuck", "unexpected-asset"} {
 		t.Run(scenario, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 			defer cancel()
@@ -29,6 +29,10 @@ func TestBrowserFlow(t *testing.T) {
 			loginHTML := `<div id="pc_disp"><form action="/webapp/nrk/FSrvLogon" method="post"><input name="userId"><input type="password" name="password"><input name="birthDate"><input id="btnLogin" type="submit" value="ログイン"></form></div>`
 			logoutHTML := `<form name="W37S0020_Head" action="/webapp/nrk/W37S0020_View.do" method="post"></form><a href="JavaScript:document.W37S0020_Head.submit();">ログアウト</a>`
 			menuHTML := logoutHTML + `<dialog id="myDialog" open><input id="btnClose" type="button" value="Close" onclick="document.getElementById('myDialog').close()"></dialog><form name="W37S1040_Form" action="/webapp/nrk/W37S1040_AssetValuePlan.do" method="post"></form><a href="JavaScript:document.W37S1040_Form.submit();">資産評価額照会</a>`
+			if scenario == "different-form-name" {
+				menuHTML = strings.ReplaceAll(menuHTML, "W37S1040_Form", "DifferentAssetForm")
+				menuHTML = strings.ReplaceAll(menuHTML, "資産評価額照会</a>", "資産評価額照会<span>現在の資産状況を確認できます</span></a>")
+			}
 			err = s.context.Route("**/*", func(route playwright.Route) {
 				u := route.Request().URL()
 				body := ""
