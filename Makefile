@@ -1,12 +1,14 @@
 SHELL=/bin/bash
 VERSION=latest
 container_name_sbi=myscrapers-sbi
+container_name_nrkn=myscrapers-nrkn
 container_name_mf=myscrapers
 
 .PHONY: build start stop debug
 
 build:
-	docker build -t $(container_name_sbi):$(VERSION) -f build/sbi/Dockerfile .
+	docker build -t $(container_name_nrkn):$(VERSION) -f build/Dockerfile --target nrkn .
+	docker build -t $(container_name_sbi):$(VERSION) -f build/Dockerfile --target sbi .
 	docker build -t $(container_name_mf):$(VERSION) -f build/moneyforward/Dockerfile .
 
 start:

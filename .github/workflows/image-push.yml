@@ -22,7 +22,11 @@ jobs:
           - image: ghcr.io/azuki774/myscrapers-mf
             dockerfile: ./build/moneyforward/Dockerfile
           - image: ghcr.io/azuki774/myscrapers-sbi
-            dockerfile: ./build/sbi/Dockerfile
+            dockerfile: ./build/Dockerfile
+            target: sbi
+          - image: ghcr.io/azuki774/myscrapers-nrkn
+            dockerfile: ./build/Dockerfile
+            target: nrkn
     runs-on: ubuntu-latest
     steps:
       - name: checkout
@@ -56,6 +60,7 @@ jobs:
         with:
           context: .
           file: ${{ matrix.dockerfile }}
+          target: ${{ matrix.target }}
           platforms: linux/amd64
           labels: ${{ steps.meta.outputs.labels }}
           tags: ${{ steps.meta.outputs.tags }}
