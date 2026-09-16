@@ -28,10 +28,33 @@ func TestBrowserFlow(t *testing.T) {
 			var logins, logouts, opens atomic.Int32
 			loginHTML := `<div id="pc_disp"><form action="/webapp/nrk/FSrvLogon" method="post"><input name="userId"><input type="password" name="password"><input name="birthDate"><input id="btnLogin" type="submit" value="ログイン"></form></div>`
 			logoutHTML := `<form name="W37S0020_Head" action="/webapp/nrk/W37S0020_View.do" method="post"></form><a href="JavaScript:document.W37S0020_Head.submit();">ログアウト</a>`
-			menuHTML := logoutHTML + `<dialog id="myDialog" open><input id="btnClose" type="button" value="Close" onclick="document.getElementById('myDialog').close()"></dialog><form name="W37S1040_Form" action="/webapp/nrk/W37S1040_AssetValuePlan.do" method="post"></form><a href="JavaScript:document.W37S1040_Form.submit();">資産評価額照会</a>`
+			// Reproduce the observed DOM structure without account fields or tokens.
+			menuHTML := logoutHTML + `<style>.popup-parent-hidden { overflow: hidden; }</style>
+<dialog id="myDialog" class="myDialog">
+  <p>メールアドレス登録のお願い</p>
+  <div class="btnWrap clearFix"><p class="floatR">
+    <input type="button" id="btnClose" name="btn_close" value="Close" onclick="closeDialog()">
+  </p></div>
+</dialog>
+<ul id="mainMenu"><li id="mainMenu01">
+  <a href="JavaScript:document.W37S1040_Form.submit();" data-lang="en" style="display:none">
+    <em>Look up asset valuation</em><span>You can look up present and past asset valuations.</span>
+  </a>
+  <a href="JavaScript:document.W37S1040_Form.submit();" data-lang="jp">
+    <em>資産評価額照会</em><span>現在と過去の資産評価額を<br>照会できます。</span>
+  </a>
+</li><li><a href="#"><em>取引履歴照会</em><span>資産評価額照会の説明</span></a></li></ul>
+<form name="W37S1040_Form" action="/webapp/nrk/W37S1040_AssetValuePlan.do" method="post"></form>
+<script>
+function closeDialog() {
+  document.getElementById('myDialog').close();
+  document.body.classList.remove('popup-parent-hidden');
+}
+document.getElementById('myDialog').showModal();
+document.body.classList.add('popup-parent-hidden');
+</script>`
 			if scenario == "different-form-name" {
 				menuHTML = strings.ReplaceAll(menuHTML, "W37S1040_Form", "DifferentAssetForm")
-				menuHTML = strings.ReplaceAll(menuHTML, "資産評価額照会</a>", "資産評価額照会<span>現在の資産状況を確認できます</span></a>")
 			}
 			err = s.context.Route("**/*", func(route playwright.Route) {
 				u := route.Request().URL()
@@ -147,8 +170,8 @@ func TestBrowserNavigationDiagnostics(t *testing.T) {
 		name, html, want string
 	}{
 		{"missing-link", `<p>private-account-marker</p>`, "stage=click, matching_elements=0, screen=menu"},
-		{"blocked-link", `<a href="#">資産評価額照会</a><div style="position:fixed;inset:0;z-index:100">private-account-marker</div>`, "stage=click, matching_elements=1, screen=menu"},
-		{"no-navigation", `<a href="javascript:void(0)">資産評価額照会</a>`, "stage=navigation, matching_elements=1, screen=menu"},
+		{"blocked-link", `<a href="#"><em>資産評価額照会</em><span>説明</span></a><div style="position:fixed;inset:0;z-index:100">private-account-marker</div>`, "stage=click, matching_elements=1, screen=menu"},
+		{"no-navigation", `<a href="javascript:void(0)"><em>資産評価額照会</em><span>説明</span></a>`, "stage=navigation, matching_elements=1, screen=menu"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			s, err := NewPlaywrightSession(context.Background(), true)

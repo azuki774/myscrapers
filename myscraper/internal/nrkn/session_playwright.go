@@ -211,10 +211,11 @@ func (s *PlaywrightSession) NavigateToAssets(ctx context.Context) error {
 	if err := s.dismissNotice(ctx); err != nil {
 		return err
 	}
-	// Select the displayed menu label, not the site's generated form name.
+	// Match the nested menu heading; the anchor also contains descriptive text.
+	// Playwright text matching can select the child em instead of the anchor.
 	// The destination below is the observed screen endpoint, not an account ID;
 	// keep validating it so an unexpected transition fails closed.
-	if err := s.clickNavigation(ctx, `a:visible:text-matches("^\\s*資産評価額照会")`, "open asset valuation"); err != nil {
+	if err := s.clickNavigation(ctx, `a:visible:has(em:text-is("資産評価額照会"))`, "open asset valuation"); err != nil {
 		return err
 	}
 	if !s.pathIs("/webapp/nrk/W37S1040_AssetValuePlan.do") {
