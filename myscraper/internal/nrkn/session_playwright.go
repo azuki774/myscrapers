@@ -104,11 +104,30 @@ func (s *PlaywrightSession) clickNavigation(ctx context.Context, selector, opera
 	if err != nil {
 		return err
 	}
+	stage := "click"
+	locator := s.page.Locator(selector)
 	_, err = s.page.ExpectNavigation(func() error {
-		return s.page.Locator(selector).First().Click(playwright.LocatorClickOptions{Timeout: playwright.Float(ms)})
+		if err := locator.First().Click(playwright.LocatorClickOptions{Timeout: playwright.Float(ms)}); err != nil {
+			return err
+		}
+		stage = "navigation"
+		return nil
 	}, playwright.PageExpectNavigationOptions{WaitUntil: playwright.WaitUntilStateDomcontentloaded, Timeout: playwright.Float(ms)})
 	if err != nil {
-		return fmt.Errorf("nrkn: %s failed", operation)
+		// Only report fixed categories and counts: Playwright errors, URLs and
+		// page text can contain credentials or account information.
+		matches, countErr := locator.Count()
+		if countErr != nil {
+			matches = -1
+		}
+		screen := "other"
+		switch {
+		case s.pathIs("/webapp/nrk/W37S0030_View.do"):
+			screen = "menu"
+		case s.pathIs("/webapp/nrk/W37S1040_AssetValuePlan.do"):
+			screen = "assets"
+		}
+		return fmt.Errorf("nrkn: %s failed (stage=%s, matching_elements=%d, screen=%s)", operation, stage, matches, screen)
 	}
 	return nil
 }

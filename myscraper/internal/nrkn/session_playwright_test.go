@@ -137,3 +137,44 @@ func TestBrowserFlow(t *testing.T) {
 		})
 	}
 }
+
+// Diagnose failures without exposing page content, URLs or Playwright call logs.
+func TestBrowserNavigationDiagnostics(t *testing.T) {
+	if os.Getenv("NRKN_BROWSER_TEST") != "1" {
+		t.Skip("set NRKN_BROWSER_TEST=1 to run local Chromium fixture")
+	}
+	for _, tc := range []struct {
+		name, html, want string
+	}{
+		{"missing-link", `<p>private-account-marker</p>`, "stage=click, matching_elements=0, screen=menu"},
+		{"blocked-link", `<a href="#">資産評価額照会</a><div style="position:fixed;inset:0;z-index:100">private-account-marker</div>`, "stage=click, matching_elements=1, screen=menu"},
+		{"no-navigation", `<a href="javascript:void(0)">資産評価額照会</a>`, "stage=navigation, matching_elements=1, screen=menu"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s, err := NewPlaywrightSession(context.Background(), true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer s.Close()
+			if err := s.context.Route("**/*", func(route playwright.Route) {
+				_ = route.Fulfill(playwright.RouteFulfillOptions{ContentType: playwright.String("text/html; charset=utf-8"), Body: tc.html})
+			}); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := s.page.Goto("https://www.nrkn.co.jp/webapp/nrk/W37S0030_View.do?token=private-token-marker"); err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			err = s.NavigateToAssets(ctx)
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("navigation error = %v, want %q", err, tc.want)
+			}
+			for _, secret := range []string{"private-account-marker", "private-token-marker", "https://", "Call log:"} {
+				if strings.Contains(err.Error(), secret) {
+					t.Fatal("navigation error exposed private diagnostic data")
+				}
+			}
+		})
+	}
+}
