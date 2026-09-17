@@ -70,4 +70,19 @@ ENV TZ=Asia/Tokyo
 
 USER myscraper
 ENTRYPOINT ["myscraper"]
+
+# The default runs the MoneyForward scraper. The same image can run the other
+# scrapers by replacing the arguments: SBI uses ["sbi", "--s3-upload"], and
+# NRKN uses ["nrkn", "--s3-upload", "--output", "/data/nrkn-assets.json"].
+# ENTRYPOINT supplies myscraper, so Docker trailing arguments, Compose
+# `command`, or Kubernetes `args` replace this CMD without a rebuild.
+# Credentials and S3 settings are supplied through environment variables.
+# All `--s3-upload` modes require BUCKET_URL, BUCKET_NAME, BUCKET_DIR,
+# AWS_REGION, AWS_ACCESS_KEY_ID, and AWS_SECRET_ACCESS_KEY.
+# MoneyForward optionally accepts MF_COOKIE_PATH (default /data/cookie.json)
+# and MF_OUTPUT_DIR (default /data); the cookie file is required for a run.
+# SBI S3 mode fetches BUCKET_DIR/passkey.json; local mode uses SBI_PASSKEY_PATH,
+# and SBI_OUTPUT optionally selects a local JSON output file.
+# NRKN requires NRKN_ID, NRKN_PASS, and NRKN_BIRTHDAY (YYYYMMDD); NRKN_OUTPUT
+# optionally selects output when --output is not supplied.
 CMD ["moneyforward", "--fetch", "--s3-upload"]
