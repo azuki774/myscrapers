@@ -11,6 +11,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/azuki774/myscrapers/myscraper/internal/logging"
 	"github.com/azuki774/myscrapers/myscraper/internal/sbi"
 	"github.com/azuki774/myscrapers/myscraper/internal/storage"
 )
@@ -55,6 +56,7 @@ func RunSBI(
 	logger *slog.Logger,
 	runner SBIRunner,
 ) int {
+	log := logging.New(logger, "sbi")
 	fs := newFlagSet(stderr)
 	var (
 		passkeyPath string
@@ -70,6 +72,19 @@ func RunSBI(
 	if err := fs.Parse(args[1:]); err != nil {
 		return 2
 	}
+	outputTarget := outPath
+	if outputTarget == "" {
+		outputTarget = "stdout"
+	}
+	runStarted := log.Started("run", "output", outputTarget, "s3_upload", s3Upload)
+	failRun := func(err error) int {
+		stage, page, ok := logging.Context(err)
+		if !ok || stage == "" {
+			stage = "run"
+		}
+		log.Error(stage, page, err)
+		return 1
+	}
 
 	var (
 		resolvedPasskeyPath string
@@ -77,17 +92,19 @@ func RunSBI(
 		s3Client            sbi.S3Client
 	)
 	if s3Upload {
+		storageStarted := log.Started("storage", "operation", "build_store")
 		store, err := buildS3Store(context.Background())
 		if err != nil {
-			logger.Error("failed to build S3 store", "error", err)
-			return 1
+			return failRun(logging.WithContext(fmt.Errorf("build S3 store: %w", err), "storage", ""))
 		}
+		log.Completed("storage", storageStarted, "operation", "build_store")
 		s3Client = store
-		pkPath, pf, err := downloadPasskey(context.Background(), store, logger)
+		credentialsStarted := log.Started("credentials", "source", "s3")
+		pkPath, pf, err := downloadPasskey(context.Background(), store)
 		if err != nil {
-			logger.Error("failed to obtain passkey", "error", err)
-			return 1
+			return failRun(logging.WithContext(fmt.Errorf("obtain passkey: %w", err), "credentials", ""))
 		}
+		log.Completed("credentials", credentialsStarted, "source", "s3")
 		// The passkey was fetched from S3 into a temp file for this
 		// run only. Delete it now so the secret does not linger on disk
 		// after the process exits (success or failure).
@@ -95,14 +112,15 @@ func RunSBI(
 		resolvedPasskeyPath = pkPath
 		passkey = pf
 		if passkeyExplicitlySet(fs) {
-			logger.Warn("--passkey is ignored in S3 mode; using S3 passkey", "path", passkeyPath)
+			log.Warning("credentials", "--passkey is ignored in S3 mode; using S3 passkey", "source", "s3")
 		}
 	} else {
+		credentialsStarted := log.Started("credentials", "source", "local")
 		pk, err := sbi.LoadPasskey(passkeyPath)
 		if err != nil {
-			logger.Error("failed to load passkey", "error", err, "path", passkeyPath)
-			return 1
+			return failRun(logging.WithContext(fmt.Errorf("load passkey: %w", err), "credentials", ""))
 		}
+		log.Completed("credentials", credentialsStarted, "source", "local")
 		resolvedPasskeyPath = passkeyPath
 		passkey = pk
 	}
@@ -112,15 +130,15 @@ func RunSBI(
 		Passkey:     passkey,
 		OutputPath:  outPath,
 		Now:         time.Now(),
-		Logger:      logger,
+		Logger:      log.Raw(),
 		Headless:    headless,
 		S3Upload:    s3Upload,
 		S3Client:    s3Client,
 	}
 	if err := runner.RunAssets(context.Background(), opts); err != nil {
-		logger.Error("sbi fetch failed", "error", err)
-		return 1
+		return failRun(err)
 	}
+	log.Completed("run", runStarted, "output", outputTarget, "s3_upload", s3Upload)
 	return 0
 }
 
@@ -140,14 +158,13 @@ func passkeyExplicitlySet(fs *flag.FlagSet) bool {
 // downloadPasskey pulls BUCKET_DIR/passkey.json into a 0600 temp file,
 // validates it, and returns the temp path plus the parsed passkey. The
 // caller is responsible for removing the temp file.
-func downloadPasskey(ctx context.Context, store s3Store, logger *slog.Logger) (string, *sbi.PasskeyFile, error) {
+func downloadPasskey(ctx context.Context, store s3Store) (string, *sbi.PasskeyFile, error) {
 	tmp, err := os.CreateTemp("", "sbi-passkey-*.json")
 	if err != nil {
 		return "", nil, fmt.Errorf("create temp passkey file: %w", err)
 	}
 	tmpPath := tmp.Name()
 	tmp.Close()
-	logger.Info("downloading passkey from S3", "key", sbi.PasskeyS3Key, "dest", tmpPath)
 	if err := store.Download(ctx, sbi.PasskeyS3Key, tmpPath); err != nil {
 		os.Remove(tmpPath)
 		return "", nil, fmt.Errorf("download passkey: %w", err)
