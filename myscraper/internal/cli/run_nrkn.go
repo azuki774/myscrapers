@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/azuki774/myscrapers/myscraper/internal/logging"
 	"github.com/azuki774/myscrapers/myscraper/internal/nrkn"
 	"github.com/azuki774/myscrapers/myscraper/internal/storage"
 )
@@ -23,6 +24,7 @@ type nrknStore interface{ nrkn.S3Client }
 var buildNRKNS3Store = func(ctx context.Context) (nrknStore, error) { return storage.New(ctx) }
 
 func RunNRKN(args []string, stdout, stderr io.Writer, logger *slog.Logger, runner NRKNRunner) int {
+	log := logging.New(logger, "nrkn")
 	fs := newFlagSet(stderr)
 	output := envOr("NRKN_OUTPUT", "")
 	headless, upload := true, false
@@ -32,25 +34,41 @@ func RunNRKN(args []string, stdout, stderr io.Writer, logger *slog.Logger, runne
 	if err := fs.Parse(args[1:]); err != nil {
 		return 2
 	}
+	outputTarget := output
+	if outputTarget == "" {
+		outputTarget = "stdout"
+	}
+	runStarted := log.Started("run", "output", outputTarget, "s3_upload", upload)
+	failRun := func(err error) int {
+		stage, page, ok := logging.Context(err)
+		if !ok || stage == "" {
+			stage = "run"
+		}
+		log.Error(stage, page, err)
+		return 1
+	}
+	credentialsStarted := log.Started("credentials", "source", "environment")
 	creds := nrkn.Credentials{ID: os.Getenv("NRKN_ID"), Password: os.Getenv("NRKN_PASS"), Birthday: os.Getenv("NRKN_BIRTHDAY")}
 	if creds.ID == "" || creds.Password == "" || creds.Birthday == "" {
-		logger.Error("NRKN_ID, NRKN_PASS, and NRKN_BIRTHDAY are required")
+		log.Error("credentials", "", fmt.Errorf("NRKN_ID, NRKN_PASS, and NRKN_BIRTHDAY are required"))
 		return 2
 	}
+	log.Completed("credentials", credentialsStarted, "source", "environment")
 	var client nrkn.S3Client
 	if upload {
+		storageStarted := log.Started("storage", "operation", "build_store")
 		store, err := buildNRKNS3Store(context.Background())
 		if err != nil {
-			logger.Error("failed to build S3 store", "error", err)
-			return 1
+			return failRun(logging.WithContext(fmt.Errorf("build S3 store: %w", err), "storage", ""))
 		}
+		log.Completed("storage", storageStarted, "operation", "build_store")
 		client = store
 	}
 	err := runner.RunAssets(context.Background(), nrkn.FetchOptions{Credentials: creds, OutputPath: output, Now: time.Now(), Logger: logger, Headless: headless, S3Upload: upload, S3Client: client})
 	if err != nil {
-		logger.Error("nrkn fetch failed", "error", err)
-		return 1
+		return failRun(err)
 	}
+	log.Completed("run", runStarted, "output", outputTarget, "s3_upload", upload)
 	return 0
 }
 

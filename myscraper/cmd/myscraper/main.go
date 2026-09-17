@@ -26,6 +26,7 @@ func main() {
 		))
 	}
 	if len(os.Args) > 1 && os.Args[1] == "sbi" {
+		logger := slog.New(slog.NewJSONHandler(os.Stderr, nil))
 		os.Exit(cli.RunSBI(
 			os.Args[1:],
 			os.Stdout,

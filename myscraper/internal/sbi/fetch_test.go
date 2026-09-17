@@ -279,7 +279,7 @@ func TestAssetsCashOthersShape(t *testing.T) {
 		foreignSummaryURL:  foreignCashFixture,
 	}}
 	sess.htmls = map[string]string{portfolioURL: portfolioHTMLFixture}
-	assets, err := FetchAssets(context.Background(), sess, time.Now(), staticFIGIResolver{})
+	assets, err := FetchAssets(context.Background(), sess, time.Now(), staticFIGIResolver{}, nil)
 	if err != nil {
 		t.Fatalf("FetchAssets: %v", err)
 	}

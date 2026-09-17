@@ -29,6 +29,31 @@ PLAYWRIGHT_E2E=1 go test ./e2e -run TestGitHubSmoke -v
 go run ./cmd/myscraper --url https://github.com --out tmp/github.html
 ```
 
+### SBI・NRKNのログ
+
+`myscrapers-sbi` と `myscrapers-nrkn` は、実行ログをstderrへ1行1JSONで出力します。
+`--output` を省略した場合、stdoutには資産JSONのみを出力します。
+SBIのログ出力先は従来のstdoutからstderrへ変更しています。ログを保存する場合は
+stderrをリダイレクトしてください（例: `myscraper sbi >assets.json 2>scrape.log`）。
+CLIのヘルプ・引数エラーの案内は従来どおりテキストです。
+
+ログには `time`、`level`、`msg` に加え、`scraper`（`sbi` / `nrkn`）、
+`stage`（処理段階）、`event`（開始・完了・失敗など）が含まれます。
+完了ログの `duration_ms` は処理時間（ミリ秒）、ページ単位の `page` は固定のページ識別名です。
+認証、ページの取得・解析、FIGI解決、JSON出力、S3保存、後処理までINFOで進捗を記録します。
+認証情報、URLのクエリ、HTML本文、銘柄ごとの明細は進捗ログに含めません。
+
+ページ完了ログの例（時刻・処理時間は例示）:
+
+```json
+{"time":"2026-09-16T00:00:00Z","level":"INFO","msg":"page completed","scraper":"sbi","stage":"page","event":"completed","page":"portfolio","duration_ms":3100}
+{"time":"2026-09-16T00:00:00Z","level":"INFO","msg":"page completed","scraper":"nrkn","stage":"page","event":"completed","page":"asset_valuation","holdings":3,"duration_ms":1200}
+```
+
+実行全体の完了とJSONの保存完了は区別します。NRKNで取得後のログアウトが失敗した場合も
+取得済みJSONを保存しますが、実行結果はERRORと非ゼロ終了で通知します。
+SBIのメンテナンス状態はWARNで通知し、既存どおり結果JSONの `status` に反映します。
+
 ### myscraper nrkn CLI
 
 NRKN の「資産評価額照会 → 合計」から全商品の最新明細を取得します。

@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/azuki774/myscrapers/myscraper/internal/logging"
 	"golang.org/x/net/html"
 )
 
@@ -67,45 +68,58 @@ func FetchAssets(ctx context.Context, sess Session, opts FetchOptions) (assets *
 	if opts.FIGIResolver == nil {
 		return nil, fmt.Errorf("nrkn: FIGI resolver is required")
 	}
+	log := logging.New(opts.Logger, "nrkn")
 	defer func() {
+		cleanupStarted := log.Started("cleanup")
 		cleanupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		if err := sess.Logout(cleanupCtx); err != nil {
+			log.Warning("cleanup", "logout failed", "operation", "logout", "error", err)
 			if retErr == nil {
-				retErr = fmt.Errorf("logout: %w", err)
+				retErr = logging.WithContext(fmt.Errorf("logout: %w", err), "cleanup", "")
 			} else {
 				retErr = fmt.Errorf("%w; logout: %v", retErr, err)
 			}
+		} else {
+			log.Completed("cleanup", cleanupStarted, "operation", "logout")
 		}
 	}()
+
+	loginStarted := log.Started("login")
 	if err := sess.Login(ctx, opts.Credentials.ID, opts.Credentials.Password, opts.Credentials.Birthday); errors.Is(err, ErrConcurrentLogin) {
+		log.Warning("login", "retrying", "reason", "concurrent_login", "attempt", 2)
 		if err = sess.Login(ctx, opts.Credentials.ID, opts.Credentials.Password, opts.Credentials.Birthday); err != nil {
-			return nil, fmt.Errorf("login retry: %w", err)
+			return nil, logging.WithContext(fmt.Errorf("login retry: %w", err), "login", "")
 		}
 	} else if err != nil {
-		return nil, fmt.Errorf("login: %w", err)
+		return nil, logging.WithContext(fmt.Errorf("login: %w", err), "login", "")
 	}
+	log.Completed("login", loginStarted)
 	// Logout is attempted exactly once by the orchestrator. A cleanup failure
 	// is returned after the JSON has been assembled so callers can preserve it
 	// while still reporting a failed run.
+	pageStarted := log.Started("page", "page", "asset_valuation")
+	pageFail := func(err error) error {
+		return logging.WithContext(err, "page", "asset_valuation")
+	}
 	if err := sess.NavigateToAssets(ctx); err != nil {
-		return nil, err
+		return nil, pageFail(err)
 	}
 	htmlText, err := sess.BodyHTML(ctx)
 	if err != nil {
-		return nil, err
+		return nil, pageFail(err)
 	}
 	holdings, err := ParseHoldingsHTML(htmlText)
 	if err != nil {
-		return nil, err
+		return nil, pageFail(err)
 	}
 	if len(holdings) == 0 {
-		return nil, fmt.Errorf("nrkn: no holdings found")
+		return nil, pageFail(fmt.Errorf("nrkn: no holdings found"))
 	}
 	a := &Assets{SchemaVersion: CurrentSchemaVersion, FetchedAt: opts.Now, Status: StatusOK, Holdings: holdings}
 	totals, err := parseTotalsHTML(htmlText)
 	if err != nil {
-		return nil, err
+		return nil, pageFail(err)
 	}
 	a.GrandTotalJPY, a.TotalCostJPY, a.PnLJPY = totals[0], totals[1], totals[2]
 	var sums [3]int64
@@ -114,20 +128,24 @@ func FetchAssets(ctx context.Context, sess Session, opts FetchOptions) (assets *
 		sums[1] += h.CostJPY
 		sums[2] += h.PnLJPY
 	}
-	if sums != totals && opts.Logger != nil {
-		opts.Logger.Warn("nrkn: displayed totals differ from holding sums; preserving displayed values")
+	if sums != totals {
+		log.Warning("page", "displayed totals differ from holding sums; preserving displayed values", "page", "asset_valuation")
 	}
+	log.Completed("page", pageStarted, "page", "asset_valuation", "holdings", len(holdings))
+
+	resolveStarted := log.Started("resolve_figi", "count", len(holdings))
 	resolved, err := opts.FIGIResolver.Resolve(ctx, holdings)
 	if err != nil {
-		return nil, fmt.Errorf("nrkn: resolve FIGIs: %w", err)
+		return nil, logging.WithContext(fmt.Errorf("nrkn: resolve FIGIs: %w", err), "resolve_figi", "")
 	}
 	for i := range a.Holdings {
 		figi := strings.TrimSpace(resolved[a.Holdings[i].ProductCode])
 		if figi == "" {
-			return nil, fmt.Errorf("nrkn: missing composite FIGI for product %q", a.Holdings[i].ProductCode)
+			return nil, logging.WithContext(fmt.Errorf("nrkn: missing composite FIGI for product %q", a.Holdings[i].ProductCode), "resolve_figi", "")
 		}
 		a.Holdings[i].CompositeFIGI = figi
 	}
+	log.Completed("resolve_figi", resolveStarted, "count", len(holdings))
 	return a, nil
 }
 

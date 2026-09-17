@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 	"unicode"
+
+	"github.com/azuki774/myscrapers/myscraper/internal/logging"
 )
 
 // S3Client is the minimal S3 surface the SBI runner needs to archive a
@@ -161,124 +163,133 @@ type OldNISA struct {
 	Funds      []Holding `json:"funds"`
 }
 
-// FetchAssets scrapes the four fixed pages and returns the consolidated asset
+// FetchAssets scrapes the five fixed pages and returns the consolidated asset
 // summary after resolving all holding identifiers through the supplied
 // resolver. The sections are mutually exclusive and collectively exhaustive:
 // nisa (new NISA), old_nisa (旧つみたてNISA), and other (cash + 特定預り投信
 // + USD deposit).
-func FetchAssets(ctx context.Context, sess Session, now time.Time, resolver FIGIResolver) (*Assets, error) {
+func FetchAssets(ctx context.Context, sess Session, now time.Time, resolver FIGIResolver, logger *slog.Logger) (*Assets, error) {
 	if resolver == nil {
 		return nil, fmt.Errorf("FIGI resolver is required")
 	}
+	log := logging.New(logger, "sbi")
 	status := StatusOK
-	// 1. Portfolio page: 旧つみたてNISA and 特定預り 投資信託 sections,
-	// plus the NISA 国内株式 / NISA 投信 holding rows.
-	if err := sess.Goto(ctx, portfolioURL); err != nil {
-		return nil, err
-	}
-	if err := sess.Wait(ctx, 3*time.Second); err != nil {
-		return nil, err
-	}
-	portfolioText, err := sess.BodyText(ctx)
-	if err != nil {
-		return nil, err
-	}
-	oldNisa, err := parseOldNISA(portfolioText)
-	if err != nil {
-		return nil, fmt.Errorf("parse old nisa: %w", err)
-	}
-	otherFunds, err := parsePortfolioValue(portfolioText, "投資信託(金額/特定預り)")
-	if err != nil {
-		return nil, fmt.Errorf("parse 特定預り: %w", err)
-	}
-	portfolioHTML, err := sess.BodyHTML(ctx)
-	if err != nil {
-		return nil, err
-	}
-	portfolioTokens := strings.Fields(portfolioText)
-	domesticHoldings, err := parseStockRowsStrict(sectionTokens(portfolioTokens, "株式（現物/NISA預り（成長投資枠））"))
-	if err != nil {
-		return nil, fmt.Errorf("parse domestic holdings: %w", err)
-	}
-	fundHoldings, err := parseFundRowsStrict(sectionTokens(portfolioTokens, "投資信託（金額/NISA預り（つみたて投資枠））"), portfolioHTML)
-	if err != nil {
-		return nil, fmt.Errorf("parse nisa funds: %w", err)
-	}
-	oldNisa.Funds, err = parseFundRowsStrict(sectionTokens(portfolioTokens, "投資信託（金額/旧つみたてNISA預り）"), portfolioHTML)
-	if err != nil {
-		return nil, fmt.Errorf("parse old nisa funds: %w", err)
-	}
-
-	// 2. NISA portfolio page (total balance, prev-day/prev-month/P&L).
-	if err := sess.Goto(ctx, nisaPortfolioURL); err != nil {
-		return nil, err
-	}
-	if err := sess.Wait(ctx, 3*time.Second); err != nil {
-		return nil, err
-	}
-	nisaText, err := sess.BodyText(ctx)
-	if err != nil {
-		return nil, err
-	}
-	var nisa NISA
-	nisa, err = parseNISA(nisaText)
-	if err != nil {
-		if isMaintenancePage(nisaText) {
-			status = StatusMaintenance
-			nisa = NISA{}
-		} else {
-			return nil, fmt.Errorf("parse nisa portfolio: %w", err)
+	// runPage keeps navigation, extraction, and parsing under one operation so
+	// a failed page emits a single failed record and never emits completed.
+	runPage := func(page, url string, withHTML bool, parse func(text, sourceHTML string) error) error {
+		started := log.Started("page", "page", page)
+		fail := func(err error) error {
+			wrapped := logging.WithContext(err, "page", page)
+			return wrapped
 		}
-	}
-	nisa.Domestic.Holdings = domesticHoldings
-	nisa.Funds.Holdings = fundHoldings
-
-	// 3. Foreign 保有銘柄 page (US stock holding rows for NISA).
-	if err := sess.Goto(ctx, foreignAssetsURL); err != nil {
-		return nil, err
-	}
-	if err := sess.Wait(ctx, 3*time.Second); err != nil {
-		return nil, err
-	}
-	assetsText, err := sess.BodyText(ctx)
-	if err != nil {
-		return nil, err
-	}
-	nisa.USStocks.Holdings, err = parseUSHoldingsStrict(assetsText)
-	if err != nil {
-		return nil, fmt.Errorf("parse US holdings: %w", err)
-	}
-
-	// 4. Domestic 口座サマリー page (現金残高等).
-	if err := sess.Goto(ctx, domesticSummaryURL); err != nil {
-		return nil, err
-	}
-	if err := sess.Wait(ctx, 3*time.Second); err != nil {
-		return nil, err
-	}
-	domText, err := sess.BodyText(ctx)
-	if err != nil {
-		return nil, err
-	}
-	cash, err := parseCash(domText)
-	if err != nil {
-		return nil, fmt.Errorf("parse cash: %w", err)
+		if err := sess.Goto(ctx, url); err != nil {
+			return fail(err)
+		}
+		if err := sess.Wait(ctx, 3*time.Second); err != nil {
+			return fail(err)
+		}
+		text, err := sess.BodyText(ctx)
+		if err != nil {
+			return fail(err)
+		}
+		sourceHTML := ""
+		if withHTML {
+			sourceHTML, err = sess.BodyHTML(ctx)
+			if err != nil {
+				return fail(err)
+			}
+		}
+		if err := parse(text, sourceHTML); err != nil {
+			return fail(err)
+		}
+		log.Completed("page", started, "page", page)
+		return nil
 	}
 
-	// 5. Foreign 口座サマリー page (USD cash deposit).
-	if err := sess.Goto(ctx, foreignSummaryURL); err != nil {
+	var oldNisa OldNISA
+	var otherFunds float64
+	var domesticHoldings, fundHoldings []Holding
+	if err := runPage("portfolio", portfolioURL, true, func(portfolioText, portfolioHTML string) error {
+		var err error
+		oldNisa, err = parseOldNISA(portfolioText)
+		if err != nil {
+			return fmt.Errorf("parse old nisa: %w", err)
+		}
+		otherFunds, err = parsePortfolioValue(portfolioText, "投資信託(金額/特定預り)")
+		if err != nil {
+			return fmt.Errorf("parse 特定預り: %w", err)
+		}
+		portfolioTokens := strings.Fields(portfolioText)
+		domesticHoldings, err = parseStockRowsStrict(sectionTokens(portfolioTokens, "株式（現物/NISA預り（成長投資枠））"))
+		if err != nil {
+			return fmt.Errorf("parse domestic holdings: %w", err)
+		}
+		fundHoldings, err = parseFundRowsStrict(sectionTokens(portfolioTokens, "投資信託（金額/NISA預り（つみたて投資枠））"), portfolioHTML)
+		if err != nil {
+			return fmt.Errorf("parse nisa funds: %w", err)
+		}
+		oldNisa.Funds, err = parseFundRowsStrict(sectionTokens(portfolioTokens, "投資信託（金額/旧つみたてNISA預り）"), portfolioHTML)
+		if err != nil {
+			return fmt.Errorf("parse old nisa funds: %w", err)
+		}
+		return nil
+	}); err != nil {
 		return nil, err
 	}
-	if err := sess.Wait(ctx, 3*time.Second); err != nil {
+
+	var nisa NISA
+	if err := runPage("nisa_portfolio", nisaPortfolioURL, false, func(nisaText, _ string) error {
+		var err error
+		nisa, err = parseNISA(nisaText)
+		if err != nil {
+			if isMaintenancePage(nisaText) {
+				status = StatusMaintenance
+				log.Warning("page", "maintenance page", "page", "nisa_portfolio")
+				nisa = NISA{}
+			} else {
+				return fmt.Errorf("parse nisa portfolio: %w", err)
+			}
+		}
+		nisa.Domestic.Holdings = domesticHoldings
+		nisa.Funds.Holdings = fundHoldings
+		return nil
+	}); err != nil {
 		return nil, err
 	}
-	summaryText, err := sess.BodyText(ctx)
-	if err != nil {
+
+	if err := runPage("foreign_assets", foreignAssetsURL, false, func(assetsText, _ string) error {
+		var err error
+		nisa.USStocks.Holdings, err = parseUSHoldingsStrict(assetsText)
+		if err != nil {
+			return fmt.Errorf("parse US holdings: %w", err)
+		}
+		return nil
+	}); err != nil {
 		return nil, err
 	}
-	usdCash, err := parseForeignCash(summaryText)
-	if err != nil {
-		return nil, fmt.Errorf("parse foreign cash: %w", err)
+
+	var cash float64
+	if err := runPage("domestic_summary", domesticSummaryURL, false, func(domText, _ string) error {
+		var err error
+		cash, err = parseCash(domText)
+		if err != nil {
+			return fmt.Errorf("parse cash: %w", err)
+		}
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	var usdCash Money
+	if err := runPage("foreign_summary", foreignSummaryURL, false, func(summaryText, _ string) error {
+		var err error
+		usdCash, err = parseForeignCash(summaryText)
+		if err != nil {
+			return fmt.Errorf("parse foreign cash: %w", err)
+		}
+		return nil
+	}); err != nil {
+		return nil, err
 	}
 
 	assets := &Assets{
@@ -295,10 +306,18 @@ func FetchAssets(ctx context.Context, sess Session, now time.Time, resolver FIGI
 		},
 	}
 	assets.GrandTotalJPY = nisa.TotalJPY + oldNisa.TotalJPY + cash + otherFunds + usdCash.ValueJPY
+	resolveStarted := log.Started("resolve_figi", "count", holdingCount(assets))
 	if err := resolveHoldingFIGIs(ctx, assets, resolver); err != nil {
-		return nil, err
+		wrapped := logging.WithContext(err, "resolve_figi", "")
+		return nil, wrapped
 	}
+	log.Completed("resolve_figi", resolveStarted, "count", holdingCount(assets))
 	return assets, nil
+}
+
+func holdingCount(assets *Assets) int {
+	return len(assets.NISA.Domestic.Holdings) + len(assets.NISA.USStocks.Holdings) +
+		len(assets.NISA.Funds.Holdings) + len(assets.OldNISA.Funds)
 }
 
 func resolveHoldingFIGIs(ctx context.Context, assets *Assets, resolver FIGIResolver) error {

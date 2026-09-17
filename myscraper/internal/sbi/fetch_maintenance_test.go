@@ -1,8 +1,13 @@
 package sbi
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
+	"io"
+	"log/slog"
+	"strings"
 	"testing"
 	"time"
 )
@@ -200,14 +205,17 @@ func (failingFIGIResolver) Resolve(context.Context, []FIGILookup) (map[FIGILooku
 // Status=maintenance instead of failing, while keeping the sections
 // that were still parseable (portfolio-derived sections).
 func TestFetchAssetsMaintenanceStatus(t *testing.T) {
+	portfolio := portfolioFixture + ` 株式（現物/NISA預り（成長投資枠）） 登録順表示 取引 銘柄（コード） 買付日 数量 取得単価 現在値 前日比 前日比（％） 損益 損益（％） 評価額 編集 現買 現売 積立 1540 純金信託 26/03/06 5 24,235 20,851 +176 +0.85 -16,920 -13.96 104,255 詳細 合計 投資信託（金額/NISA預り（つみたて投資枠）） 登録順表示 取引 ファンド名 買付日 数量 取得単価 現在値 前日比 前日比（％） 損益 損益（％） 評価額 編集 積立 売却 NISAファンド --/--/-- 1,000 500 1,000 +1 +0.10 +100 +10.0 1,000 詳細 合計`
+	portfolioHTML := portfolioHTMLFixture + `<table><tr><td>NISAファンド</td><td><a href="/fund?fund_sec_code=1234NISA">詳細</a></td></tr></table>`
+	var logs bytes.Buffer
 	sess := &fakeSession{bodies: map[string]string{
-		portfolioURL:       portfolioFixture,
+		portfolioURL:       portfolio,
 		nisaPortfolioURL:   maintenanceFixture,
 		foreignAssetsURL:   foreignHoldingsFixture,
 		domesticSummaryURL: cashFixture,
 		foreignSummaryURL:  foreignCashFixture,
-	}, htmls: map[string]string{portfolioURL: portfolioHTMLFixture}}
-	assets, err := FetchAssets(context.Background(), sess, time.Now(), staticFIGIResolver{})
+	}, htmls: map[string]string{portfolioURL: portfolioHTML}}
+	assets, err := FetchAssets(context.Background(), sess, time.Now(), staticFIGIResolver{}, slog.New(slog.NewJSONHandler(&logs, nil)))
 	if err != nil {
 		t.Fatalf("FetchAssets: %v", err)
 	}
@@ -219,6 +227,31 @@ func TestFetchAssetsMaintenanceStatus(t *testing.T) {
 	}
 	if assets.OldNISA.TotalJPY != 4000 {
 		t.Errorf("OldNISA.TotalJPY = %v, want collected portfolio data", assets.OldNISA.TotalJPY)
+	}
+	if len(assets.OldNISA.Funds) != 1 || len(assets.NISA.Domestic.Holdings) != 1 || len(assets.NISA.Funds.Holdings) != 1 {
+		t.Errorf("portfolio holdings were not preserved on NISA maintenance: old=%d domestic=%d funds=%d", len(assets.OldNISA.Funds), len(assets.NISA.Domestic.Holdings), len(assets.NISA.Funds.Holdings))
+	}
+	if len(assets.NISA.Domestic.Holdings) == 1 && len(assets.NISA.Funds.Holdings) == 1 &&
+		(assets.NISA.Domestic.Holdings[0].Name != "純金信託" || assets.NISA.Funds.Holdings[0].Name != "NISAファンド") {
+		t.Errorf("NISA holdings were not preserved: domestic=%q funds=%q", assets.NISA.Domestic.Holdings[0].Name, assets.NISA.Funds.Holdings[0].Name)
+	}
+	var sawMaintenanceWarning bool
+	for decoder := json.NewDecoder(&logs); ; {
+		var record map[string]any
+		err := decoder.Decode(&record)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatalf("decode log: %v", err)
+		}
+		message, _ := record["message"].(string)
+		if record["stage"] == "page" && record["page"] == "nisa_portfolio" && record["event"] == "warning" && strings.Contains(message, "maintenance") {
+			sawMaintenanceWarning = true
+		}
+	}
+	if !sawMaintenanceWarning {
+		t.Fatal("maintenance warning record missing")
 	}
 	if assets.Cash.JPY.ValueJPY != 12345 {
 		t.Errorf("Cash.JPY.ValueJPY = %v, want collected cash data", assets.Cash.JPY.ValueJPY)
@@ -235,7 +268,7 @@ func TestFetchAssetsOKStatus(t *testing.T) {
 		domesticSummaryURL: cashFixture,
 		foreignSummaryURL:  foreignCashFixture,
 	}, htmls: map[string]string{portfolioURL: portfolioHTMLFixture}}
-	assets, err := FetchAssets(context.Background(), sess, time.Now(), staticFIGIResolver{})
+	assets, err := FetchAssets(context.Background(), sess, time.Now(), staticFIGIResolver{}, nil)
 	if err != nil {
 		t.Fatalf("FetchAssets: %v", err)
 	}
@@ -260,7 +293,7 @@ func TestFetchAssetsFIGIResolverFailureReturnsNoAssets(t *testing.T) {
 		domesticSummaryURL: cashFixture,
 		foreignSummaryURL:  foreignCashFixture,
 	}, htmls: map[string]string{portfolioURL: portfolioHTMLFixture}}
-	assets, err := FetchAssets(context.Background(), sess, time.Now(), failingFIGIResolver{})
+	assets, err := FetchAssets(context.Background(), sess, time.Now(), failingFIGIResolver{}, nil)
 	if err == nil || assets != nil {
 		t.Fatalf("assets=%#v err=%v, want nil assets and resolver error", assets, err)
 	}
