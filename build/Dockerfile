@@ -70,10 +70,4 @@ ENV TZ=Asia/Tokyo
 
 USER myscraper
 ENTRYPOINT ["myscraper"]
-
-FROM runtime AS nrkn
-CMD ["nrkn", "--s3-upload"]
-
-# Keep SBI as the default target for builds without --target.
-FROM runtime AS sbi
-CMD ["sbi", "--s3-upload"]
+CMD ["moneyforward", "--fetch", "--s3-upload"]

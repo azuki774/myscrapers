@@ -16,17 +16,6 @@ env:
 
 jobs:
   build:
-    strategy:
-      matrix:
-        include:
-          - image: ghcr.io/azuki774/myscrapers-mf
-            dockerfile: ./build/moneyforward/Dockerfile
-          - image: ghcr.io/azuki774/myscrapers-sbi
-            dockerfile: ./build/Dockerfile
-            target: sbi
-          - image: ghcr.io/azuki774/myscrapers-nrkn
-            dockerfile: ./build/Dockerfile
-            target: nrkn
     runs-on: ubuntu-latest
     steps:
       - name: checkout
@@ -47,7 +36,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@818d4b7b91585d195f67373fd9cb0332e31a7175 # v4
         with:
-          images: ${{ matrix.image }}
+          images: ghcr.io/azuki774/myscrapers
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
@@ -55,13 +44,53 @@ jobs:
             type=semver,pattern=latest
             type=sha,format=short,prefix=,enable=${{ github.ref == 'refs/heads/master' }}
 
-      - name: Build and push image
+      - name: Build image
         uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
         with:
           context: .
-          file: ${{ matrix.dockerfile }}
-          target: ${{ matrix.target }}
+          file: ./build/Dockerfile
           platforms: linux/amd64
           labels: ${{ steps.meta.outputs.labels }}
-          tags: ${{ steps.meta.outputs.tags }}
-          push: ${{ (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/')) && 'true' || 'false' }}
+          tags: |
+            myscrapers:ci
+            ${{ steps.meta.outputs.tags }}
+          load: true
+
+      - name: Smoke test image
+        run: |
+          set -euo pipefail
+
+          docker inspect myscrapers:ci | jq -e '
+            .[0].Config.Entrypoint == ["myscraper"] and
+            .[0].Config.Cmd == ["moneyforward", "--fetch", "--s3-upload"] and
+            .[0].Config.User == "myscraper"
+          '
+          docker run --network none --rm --entrypoint /playwright/.driver/node myscrapers:ci --version
+          docker run --network none --rm --entrypoint chromium myscrapers:ci --version
+          docker run --network none --rm myscrapers:ci \
+            --url 'data:text/html,%3Ctitle%3Emyscrapers%20smoke%3C/title%3E' \
+            --out /tmp/myscrapers-smoke.html
+
+          for command in moneyforward sbi nrkn; do
+            log_path=$(mktemp)
+            set +e
+            docker run --network none --rm myscrapers:ci "$command" --unknown-flag >"$log_path" 2>&1
+            exit_code=$?
+            set -e
+            if [ "$exit_code" -ne 2 ] || ! grep -Fq 'flag provided but not defined' "$log_path"; then
+              echo "unexpected $command smoke exit code: $exit_code"
+              sed -n '1,80p' "$log_path"
+              exit 1
+            fi
+            rm -f "$log_path"
+          done
+
+      - name: Push image
+        if: github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/')
+        env:
+          IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          set -euo pipefail
+          while IFS= read -r tag; do
+            [ -n "$tag" ] && docker push "$tag"
+          done <<< "$IMAGE_TAGS"
