@@ -127,7 +127,7 @@ spec:
           restartPolicy: OnFailure
           containers:
             - name: myscrapers
-              image: ghcr.io/azuki774/myscrapers-mf:latest
+              image: ghcr.io/azuki774/myscrapers:latest
               args: ["moneyforward", "--fetch", "--s3-upload"]
               env:
                 - name: TZ
@@ -194,7 +194,7 @@ spec:
           restartPolicy: OnFailure
           containers:
             - name: myscrapers
-              image: ghcr.io/azuki774/myscrapers-mf:latest
+              image: ghcr.io/azuki774/myscrapers:latest
               args: ["moneyforward", "--update"]
               env:
                 - name: TZ

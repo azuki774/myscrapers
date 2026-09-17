@@ -2,17 +2,21 @@
 
 ## Container images
 
-The `v*` release workflow publishes all images for `linux/amd64` with semver
+The `v*` release workflow publishes one image for `linux/amd64` with semver
 tags and `latest`. Arm64 publishing is temporarily suspended because the
 additional build time is too high:
 
-- `ghcr.io/azuki774/myscrapers-mf`
-- `ghcr.io/azuki774/myscrapers-sbi`
-- `ghcr.io/azuki774/myscrapers-nrkn`
+- `ghcr.io/azuki774/myscrapers`
 
-Pushes to `master` publish all images with the first seven characters of the
+Pushes to `master` publish the image with the first seven characters of the
 commit SHA as the tag (for example, `a1b2c3d`). These pushes do not update
-`latest`. Pushes to other branches build the images without publishing them.
+`latest`. Pushes to other branches build the image without publishing it.
+Existing tags for the previous three image names remain available for rollback,
+but the workflow no longer updates them.
+
+The image entrypoint is `myscraper`. Its default command is
+`moneyforward --fetch --s3-upload`; pass `sbi` or `nrkn` and their flags as
+arguments when running those scrapers.
 
 ## myscraper (Go)
 
@@ -100,7 +104,7 @@ SBI同様に新しいJSONを出力・保存・S3送信せず失敗とします�
 日次ジョブの例（cronのタイムゾーンをAsia/Tokyoに設定済みのホスト）:
 
 ```cron
-15 7 * * * /usr/bin/flock -n /var/lock/nrkn-assets.lock /usr/bin/docker run --rm --env-file /etc/myscrapers/nrkn.env ghcr.io/azuki774/myscrapers-nrkn:latest
+15 7 * * * /usr/bin/flock -n /var/lock/nrkn-assets.lock /usr/bin/docker run --rm --env-file /etc/myscrapers/nrkn.env ghcr.io/azuki774/myscrapers:latest nrkn --s3-upload
 ```
 
 環境変数ファイルは管理者が0600で配置し、NRKN認証情報とS3設定を指定します。
@@ -246,8 +250,8 @@ myscraper moneyforward --fetch --output-dir ./out --cookie-path ./cookie.json
 (the compose file directory itself) to `/data`. That keeps the cookie at
 `deployment/cookie.json` while still letting the scraper read
 `/data/cookie.json`, `MF_OUTPUT_DIR=/data/out` keeps scrape output under
-`deployment/out/`, and `PLAYWRIGHT_DRIVER_PATH=/data/.playwright-driver`
-persists the Playwright driver across local runs.
+`deployment/out/`. The Playwright driver is included in the image, so no
+separate driver volume is needed.
 `deployment/cookie.json` is ignored by Git so the browser-exported cookie file
 does not get committed by accident.
 
@@ -256,8 +260,6 @@ mkdir -p deployment/out
 cp /path/to/browser-exported-cookie.json deployment/cookie.json
 podman compose -f deployment/compose.yml build
 podman compose -f deployment/compose.yml run --rm myscrapers
-# first run may download the Playwright driver into deployment/.playwright-driver
-
 # run update instead of fetch
 podman compose -f deployment/compose.yml run --rm myscrapers \
   moneyforward --update
