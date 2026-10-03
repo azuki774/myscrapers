@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -82,7 +83,14 @@ func RunSBI(
 		if !ok || stage == "" {
 			stage = "run"
 		}
-		log.Error(stage, page, err)
+		var attrs []any
+		switch {
+		case errors.Is(err, sbi.ErrMaintenance):
+			attrs = append(attrs, "reason", "maintenance")
+		case errors.Is(err, sbi.ErrUnexpectedPage):
+			attrs = append(attrs, "reason", "unexpected_page")
+		}
+		log.Error(stage, page, err, attrs...)
 		return 1
 	}
 

@@ -15,14 +15,21 @@ import (
 // Playwright-backed Session, logs in with the saved passkey, fetches
 // the asset summary, and writes JSON.
 type sbiRunner struct {
-	logger *slog.Logger
-	stdout io.Writer
+	logger     *slog.Logger
+	stdout     io.Writer
+	newSession func(context.Context, bool) (sbi.Session, error)
 }
 
 func (r sbiRunner) RunAssets(ctx context.Context, opts sbi.FetchOptions) error {
 	log := logging.New(r.logger, "sbi")
 	sessionStarted := log.Started("session", "headless", opts.Headless)
-	sess, err := sbi.NewPlaywrightSession(ctx, opts.Headless)
+	newSession := r.newSession
+	if newSession == nil {
+		newSession = func(ctx context.Context, headless bool) (sbi.Session, error) {
+			return sbi.NewPlaywrightSession(ctx, headless)
+		}
+	}
+	sess, err := newSession(ctx, opts.Headless)
 	if err != nil {
 		return logging.WithContext(fmt.Errorf("open session: %w", err), "session", "")
 	}
