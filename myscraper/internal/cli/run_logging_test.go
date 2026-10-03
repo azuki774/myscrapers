@@ -11,6 +11,7 @@ import (
 
 	"github.com/azuki774/myscrapers/myscraper/internal/logging"
 	"github.com/azuki774/myscrapers/myscraper/internal/nrkn"
+	"github.com/azuki774/myscrapers/myscraper/internal/sbi"
 )
 
 func TestRunSBITerminalErrorContainsFailurePageOnce(t *testing.T) {
@@ -41,6 +42,47 @@ func TestRunSBITerminalErrorContainsFailurePageOnce(t *testing.T) {
 	}
 	if errorsFound[0]["stage"] != "page" || errorsFound[0]["page"] != "portfolio" {
 		t.Fatalf("terminal context = stage=%v page=%v, want page/portfolio", errorsFound[0]["stage"], errorsFound[0]["page"])
+	}
+}
+
+func TestRunSBIPageFailureReason(t *testing.T) {
+	for _, tc := range []struct {
+		reason string
+		err    error
+	}{
+		{"maintenance", sbi.ErrMaintenance},
+		{"unexpected_page", sbi.ErrUnexpectedPage},
+	} {
+		t.Run(tc.reason, func(t *testing.T) {
+			passkey := writePasskeyFile(t, t.TempDir())
+			var logs, stdout bytes.Buffer
+			runner := &fakeSBIRunner{err: logging.WithContext(tc.err, "page", "foreign_assets")}
+			code := RunSBI([]string{"sbi", "--passkey", passkey}, &stdout, &bytes.Buffer{}, slog.New(slog.NewJSONHandler(&logs, nil)), runner)
+			if code != 1 || stdout.Len() != 0 {
+				t.Fatal("failed fetch must exit 1 without output")
+			}
+			decoder := json.NewDecoder(&logs)
+			failures := 0
+			for {
+				var record map[string]any
+				err := decoder.Decode(&record)
+				if err == io.EOF {
+					break
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				if record["event"] == "failed" {
+					failures++
+					if record["reason"] != tc.reason || record["page"] != "foreign_assets" || record["stage"] != "page" {
+						t.Fatal("incorrect failure classification")
+					}
+				}
+			}
+			if failures != 1 {
+				t.Fatalf("failure records = %d, want 1", failures)
+			}
+		})
 	}
 }
 

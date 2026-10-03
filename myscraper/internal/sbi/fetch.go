@@ -258,10 +258,18 @@ func FetchAssets(ctx context.Context, sess Session, now time.Time, resolver FIGI
 	}
 
 	if err := runPage("foreign_assets", foreignAssetsURL, false, func(assetsText, _ string) error {
+		if isMaintenancePage(assetsText) {
+			return ErrMaintenance
+		}
 		var err error
 		nisa.USStocks.Holdings, err = parseUSHoldingsStrict(assetsText)
 		if err != nil {
 			return fmt.Errorf("parse US holdings: %w", err)
+		}
+		// An empty parse alone cannot distinguish no holdings from a login,
+		// outage, or changed page. Do not publish an unverified empty balance.
+		if len(nisa.USStocks.Holdings) == 0 {
+			return ErrUnexpectedPage
 		}
 		return nil
 	}); err != nil {
@@ -282,6 +290,12 @@ func FetchAssets(ctx context.Context, sess Session, now time.Time, resolver FIGI
 
 	var usdCash Money
 	if err := runPage("foreign_summary", foreignSummaryURL, false, func(summaryText, _ string) error {
+		if isMaintenancePage(summaryText) {
+			return ErrMaintenance
+		}
+		if !strings.Contains(summaryText, "保有資産評価") || !strings.Contains(summaryText, "預り金") {
+			return ErrUnexpectedPage
+		}
 		var err error
 		usdCash, err = parseForeignCash(summaryText)
 		if err != nil {
@@ -382,9 +396,9 @@ func parseAmount(s string) (float64, error) {
 // serves such a page (e.g. after a redirect from a NISA route during
 // scheduled maintenance) with a maintenance notice and no asset data.
 func isMaintenancePage(text string) bool {
+	text = strings.Join(strings.Fields(text), "")
 	for _, m := range []string{
-		"臨時メンテナンスのお知らせ",
-		"メンテナンスのお知らせ",
+		"現在、システムメンテナンスのため",
 		"サービスのご利用ができません",
 	} {
 		if strings.Contains(text, m) {
