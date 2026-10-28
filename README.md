@@ -268,3 +268,10 @@ podman compose -f deployment/compose.yml run --rm myscrapers \
 If an older compose setup created `deployment/deployment/` or turned
 `deployment/cookie.json` into a directory, remove those leftovers before
 running the container again.
+
+## Renovate policy
+
+- Configuration: [`renovate.jsonc`](renovate.jsonc). Normal update PRs are scheduled for Friday 20:00–20:59 in `Asia/Tokyo`. This is an hour window, not a guarantee of execution at exactly 20:00; execution depends on when Renovate runs.
+- Normal updates have a limit of 7 concurrent PRs and no hourly PR creation limit.
+- Security updates based on vulnerability alerts bypass both the normal schedule and the 7-PR concurrency limit and are eligible for immediate PR creation. Enable GitHub's dependency graph and Dependabot alerts, and grant Renovate permission to read alerts and create PRs.
+- GitHub Actions are pinned to commit SHAs (SHA-1), and only Actions updates are eligible for automerge. Other dependencies are not automerged.
