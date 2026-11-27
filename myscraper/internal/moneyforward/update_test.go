@@ -34,7 +34,7 @@ func TestUpdateClicksBulkUpdateAndSuica(t *testing.T) {
 		"Goto:https://moneyforward.com/cf",
 		"ClickByXPath:/html/body/div[1]/div[2]/div[1]/div/div/div/section/p[2]/a",
 		"Goto:https://moneyforward.com/",
-		"ClickLinkIn:li.account.facilities-column:更新",
+		"ClickLinkInRow:li.account.facilities-column:モバイルSuica:更新",
 	}
 	combined := ""
 	for _, c := range sess.calls {

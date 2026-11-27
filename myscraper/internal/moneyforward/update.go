@@ -9,18 +9,19 @@ import (
 )
 
 const (
-	accountsURL     = "https://moneyforward.com/accounts"
-	homeURL         = "https://moneyforward.com/"
-	bulkUpdateXPath = "/html/body/div[1]/div[2]/div[1]/div/div/div/section/p[2]/a"
-	accountListSel  = "li.account.facilities-column"
-	suicaUpdateText = "更新"
-	postUpdateSleep = 60 * time.Second
-	postHomeSleep   = 10 * time.Second
+	accountsURL      = "https://moneyforward.com/accounts"
+	homeURL          = "https://moneyforward.com/"
+	bulkUpdateXPath  = "/html/body/div[1]/div[2]/div[1]/div/div/div/section/p[2]/a"
+	accountListSel   = "li.account.facilities-column"
+	suicaAccountText = "モバイルSuica"
+	suicaUpdateText  = "更新"
+	postUpdateSleep  = 60 * time.Second
+	postHomeSleep    = 10 * time.Second
 )
 
 // UpdateOptions mirrors FetchOptions for the Update subcommand. SuicaPage
 // is optional and currently unused at the Session level — the Suica
-// search happens via ClickLinkIn which the fakeSession asserts.
+// search happens via ClickLinkInRow which the fakeSession asserts.
 type UpdateOptions struct {
 	Session Session
 	Cookies []Cookie
@@ -78,7 +79,7 @@ func Update(ctx context.Context, opts UpdateOptions) error {
 		return fmt.Errorf("wait after home: %w", err)
 	}
 	logger.Info("looking for Suica 更新 link")
-	if err := opts.Session.ClickLinkIn(ctx, accountListSel, suicaUpdateText); err != nil {
+	if err := opts.Session.ClickLinkInRow(ctx, accountListSel, suicaAccountText, suicaUpdateText); err != nil {
 		logger.Warn("could not find Suica account or 更新 link; skipping", "error", err)
 		return nil
 	}

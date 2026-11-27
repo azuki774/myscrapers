@@ -16,7 +16,9 @@ type Session interface {
 	Content(ctx context.Context) (string, error)
 	ClickByXPath(ctx context.Context, xpath string) error
 	ClickByText(ctx context.Context, text string) error
-	ClickLinkIn(ctx context.Context, parentSelector, linkText string) error
+	// ClickLinkInRow clicks the link whose exact text is linkText inside the
+	// parentSelector element whose text contains rowContainsText.
+	ClickLinkInRow(ctx context.Context, parentSelector, rowContainsText, linkText string) error
 	Wait(ctx context.Context, d time.Duration) error
 	Close() error
 }
