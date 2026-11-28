@@ -74,9 +74,10 @@ func (f *fakeSession) ClickByText(_ context.Context, text string) error {
 	return f.clickErr
 }
 
-func (f *fakeSession) ClickLinkIn(_ context.Context, parent, link string) error {
-	f.calls = append(f.calls, "ClickLinkIn:"+parent+":"+link)
-	f.clicks = append(f.clicks, "linkin:"+parent+":"+link)
+func (f *fakeSession) ClickLinkInRow(_ context.Context, parent, row, link string) error {
+	entry := "ClickLinkInRow:" + parent + ":" + row + ":" + link
+	f.calls = append(f.calls, entry)
+	f.clicks = append(f.clicks, entry)
 	return f.clickErr
 }
 

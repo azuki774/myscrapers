@@ -144,10 +144,20 @@ func (s *PlaywrightSession) ClickByText(_ context.Context, text string) error {
 	return nil
 }
 
-func (s *PlaywrightSession) ClickLinkIn(_ context.Context, parentSelector, linkText string) error {
-	loc := s.page.Locator(parentSelector).GetByText(linkText)
-	if err := loc.Click(); err != nil {
-		return fmt.Errorf("click %q in %q: %w", linkText, parentSelector, err)
+func (s *PlaywrightSession) ClickLinkInRow(_ context.Context, parentSelector, rowContainsText, linkText string) error {
+	row := s.page.Locator(parentSelector).
+		Filter(playwright.LocatorFilterOptions{HasText: rowContainsText})
+	link := row.GetByRole(*playwright.AriaRoleLink,
+		playwright.LocatorGetByRoleOptions{Name: linkText, Exact: playwright.Bool(true)})
+	n, err := link.Count()
+	if err != nil {
+		return fmt.Errorf("count %q links in %q row containing %q: %w", linkText, parentSelector, rowContainsText, err)
+	}
+	if n == 0 {
+		return fmt.Errorf("no %q link in %q row containing %q: row missing or already updating", linkText, parentSelector, rowContainsText)
+	}
+	if err := link.Click(); err != nil {
+		return fmt.Errorf("click %q in %q row containing %q: %w", linkText, parentSelector, rowContainsText, err)
 	}
 	return nil
 }
